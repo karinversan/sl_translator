@@ -40,10 +40,16 @@ export function LiveScreen() {
   const [open, setOpen] = useState(false);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
   const [settings, setSettings] = useState<LiveSettingsState>(defaultSettings);
-  const [subtitleLines, setSubtitleLines] = useState(seedSubtitles());
+  const [subtitleLines, setSubtitleLines] = useState<ReturnType<typeof seedSubtitles>>([]);
   const [confidence, setConfidence] = useState(86);
   const seedRef = useRef(2);
   const isDesktop = useMediaQuery("(min-width: 768px)");
+
+  useEffect(() => {
+    const seeded = seedSubtitles();
+    setSubtitleLines(seeded);
+    if (seeded[1]) setConfidence(seeded[1].confidence);
+  }, []);
 
   useEffect(() => {
     if (!isRunning) {
