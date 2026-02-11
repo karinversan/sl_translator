@@ -21,11 +21,14 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
+.env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
 
 # IDE
 .vscode/
@@ -47,4 +50,4 @@ Thumbs.db
 *.temp
 
 # Documentation (uncomment if you want to ignore docs)
-# docs/
+docs/
