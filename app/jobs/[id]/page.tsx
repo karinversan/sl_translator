@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   ChevronLeft,
@@ -38,6 +38,7 @@ import { defaultTranscript, TranscriptSegment } from "@/lib/mock/jobs";
 import { formatSrtTime, formatTimecode, parseTimecodeInput, toSeconds } from "@/lib/utils/timecode";
 
 type PreviewMode = "Original" | "Subtitled" | "Voiceover";
+type TimelineZoom = "fit" | 1 | 2 | 4;
 
 function download(name: string, content: string, type = "text/plain") {
   const blob = new Blob([content], { type });
@@ -92,6 +93,8 @@ export default function JobDetailsPage() {
   const [activeSegmentId, setActiveSegmentId] = useState(defaultTranscript[0]?.id ?? "");
   const [segmentQuery, setSegmentQuery] = useState("");
   const [jumpTo, setJumpTo] = useState("");
+  const [timelineZoom, setTimelineZoom] = useState<TimelineZoom>("fit");
+  const timelineViewportRef = useRef<HTMLDivElement | null>(null);
 
   const [subtitleSize, setSubtitleSize] = useState<"S" | "M" | "L">("M");
   const [subtitlePosition, setSubtitlePosition] = useState<"bottom" | "top">("bottom");
@@ -104,6 +107,27 @@ export default function JobDetailsPage() {
     [segments]
   );
   const [playheadSec, setPlayheadSec] = useState(0);
+  const zoomLevels: TimelineZoom[] = ["fit", 1, 2, 4];
+  const pxPerSecond = timelineZoom === "fit" ? 0 : 14 * timelineZoom;
+
+  const trackWidthStyle = useMemo(() => {
+    if (timelineZoom === "fit") return "100%";
+    return `${Math.max(totalDuration * pxPerSecond, 680)}px`;
+  }, [timelineZoom, totalDuration, pxPerSecond]);
+
+  const getTrackPosition = (second: number) => {
+    if (timelineZoom === "fit") {
+      return `${(second / totalDuration) * 100}%`;
+    }
+    return `${second * pxPerSecond}px`;
+  };
+
+  const getTrackWidth = (duration: number) => {
+    if (timelineZoom === "fit") {
+      return `${Math.max((duration / totalDuration) * 100, 1.5)}%`;
+    }
+    return `${Math.max(duration * pxPerSecond, 6)}px`;
+  };
 
   useEffect(() => {
     if (status === "Done") return;
@@ -132,6 +156,14 @@ export default function JobDetailsPage() {
       setActiveSegmentId(activeFromPlayhead.id);
     }
   }, [activeFromPlayhead, activeSegmentId]);
+
+  useEffect(() => {
+    if (timelineZoom === "fit") return;
+    const viewport = timelineViewportRef.current;
+    if (!viewport) return;
+    const nextLeft = Math.max(playheadSec * pxPerSecond - viewport.clientWidth * 0.5, 0);
+    viewport.scrollTo({ left: nextLeft, behavior: "auto" });
+  }, [playheadSec, timelineZoom, pxPerSecond]);
 
   const updateSegment = (id: string, patch: Partial<TranscriptSegment>) => {
     setSegments((prev) => prev.map((segment) => (segment.id === id ? { ...segment, ...patch } : segment)));
@@ -262,7 +294,7 @@ export default function JobDetailsPage() {
       </Card>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1.46fr_0.84fr]">
-        <Card className="border-white/10 bg-black/50">
+        <Card className="min-w-0 border-white/10 bg-black/50">
           <CardHeader>
             <Tabs defaultValue="preview" className="w-full">
               <TabsList>
@@ -311,6 +343,26 @@ export default function JobDetailsPage() {
                       <span>{segments.length} segments</span>
                     </div>
 
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Timeline zoom</span>
+                      {zoomLevels.map((level) => {
+                        const active = timelineZoom === level;
+                        const label = level === "fit" ? "Fit" : `${level}x`;
+                        return (
+                          <Button
+                            key={label}
+                            type="button"
+                            size="sm"
+                            variant={active ? "default" : "secondary"}
+                            className="h-7 px-3 text-xs"
+                            onClick={() => setTimelineZoom(level)}
+                          >
+                            {label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
                     <Slider
                       min={0}
                       max={totalDuration}
@@ -319,29 +371,40 @@ export default function JobDetailsPage() {
                       onValueChange={(value) => setPlayheadSec(value[0] ?? 0)}
                     />
 
-                    <div className="relative mt-3 h-8 rounded-md border border-white/10 bg-black/30">
-                      {segments.map((segment) => {
-                        const start = toSeconds(segment.start);
-                        const end = toSeconds(segment.end);
-                        const left = (start / totalDuration) * 100;
-                        const width = Math.max(((end - start) / totalDuration) * 100, 1.5);
-                        const active = segment.id === activeSegmentId;
+                    <div
+                      ref={timelineViewportRef}
+                      className="mt-3 w-full max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain pb-1"
+                    >
+                      <div
+                        className="relative h-8 rounded-md border border-white/10 bg-black/30"
+                        style={{ width: trackWidthStyle, minWidth: "100%" }}
+                      >
+                        <div
+                          className="pointer-events-none absolute bottom-0 top-0 w-px bg-white/60"
+                          style={{ left: getTrackPosition(playheadSec) }}
+                        />
+                        {segments.map((segment) => {
+                          const start = toSeconds(segment.start);
+                          const end = toSeconds(segment.end);
+                          const active = segment.id === activeSegmentId;
+                          const duration = Math.max(end - start, 1);
 
-                        return (
-                          <button
-                            key={segment.id}
-                            type="button"
-                            onClick={() => selectSegment(segment)}
-                            className={`absolute top-1 h-6 rounded-sm border transition ${
-                              active
-                                ? "border-white/40 bg-white/35"
-                                : "border-white/15 bg-white/10 hover:border-white/35"
-                            }`}
-                            style={{ left: `${left}%`, width: `${width}%` }}
-                            title={`${segment.start} - ${segment.end}`}
-                          />
-                        );
-                      })}
+                          return (
+                            <button
+                              key={segment.id}
+                              type="button"
+                              onClick={() => selectSegment(segment)}
+                              className={`absolute top-1 h-6 rounded-sm border transition ${
+                                active
+                                  ? "border-white/40 bg-white/35"
+                                  : "border-white/15 bg-white/10 hover:border-white/35"
+                              }`}
+                              style={{ left: getTrackPosition(start), width: getTrackWidth(duration) }}
+                              title={`${segment.start} - ${segment.end}`}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-2">
