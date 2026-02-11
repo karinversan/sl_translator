@@ -40,7 +40,7 @@ Next.js 14 frontend prototype for sign language subtitles workflow.
 - `components/layout/site-header.tsx`
   - Fixed header with scrollspy for landing sections
   - Mobile sheet menu with larger hitboxes
-  - Persistent CTA: `Запустить демо`
+  - Persistent CTA: `Launch demo`
 - `components/layout/custom-cursor.tsx`
   - Desktop-only custom cursor (dot + ring)
   - Hover states for interactive targets
