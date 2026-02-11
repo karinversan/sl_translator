@@ -55,6 +55,12 @@ export function CustomCursor() {
       return "default";
     };
 
+    const ensureAnimation = () => {
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+
     const onMove = (event: MouseEvent) => {
       pointerRef.current.x = event.clientX;
       pointerRef.current.y = event.clientY;
@@ -67,6 +73,7 @@ export function CustomCursor() {
         modeRef.current = nextMode;
         setMode(nextMode);
       }
+      ensureAnimation();
     };
 
     const onDown = () => setPressed(true);
@@ -77,6 +84,7 @@ export function CustomCursor() {
         modeRef.current = nextMode;
         setMode(nextMode);
       }
+      ensureAnimation();
     };
     const onLeave = () => {
       visibleRef.current = false;
@@ -84,7 +92,7 @@ export function CustomCursor() {
     };
 
     const animate = () => {
-      const lag = 0.58;
+      const lag = 0.88;
       ringPosRef.current.x += (pointerRef.current.x - ringPosRef.current.x) * lag;
       ringPosRef.current.y += (pointerRef.current.y - ringPosRef.current.y) * lag;
 
@@ -94,10 +102,17 @@ export function CustomCursor() {
       if (ringRef.current) {
         ringRef.current.style.transform = `translate3d(${ringPosRef.current.x}px, ${ringPosRef.current.y}px, 0)`;
       }
-      rafRef.current = requestAnimationFrame(animate);
+      const dx = Math.abs(pointerRef.current.x - ringPosRef.current.x);
+      const dy = Math.abs(pointerRef.current.y - ringPosRef.current.y);
+      const keepRunning = dx > 0.2 || dy > 0.2;
+
+      if (keepRunning) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        rafRef.current = undefined;
+      }
     };
 
-    rafRef.current = requestAnimationFrame(animate);
     window.addEventListener("mousemove", onMove, { passive: true });
     window.addEventListener("mousedown", onDown, { passive: true });
     window.addEventListener("mouseup", onUp, { passive: true });
