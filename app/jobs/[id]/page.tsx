@@ -136,16 +136,16 @@ export default function JobDetailsPage() {
       <div className="page-head flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="page-kicker">Job details</p>
-          <h1 className="section-title text-[2.2rem] md:text-5xl">Результат и редактор</h1>
+          <h1 className="section-title text-[2.2rem] md:text-5xl">Results and Editor</h1>
           <p className="page-lead max-w-4xl">
-            Любое изменение субтитров сразу обновляет итоговый preview и voiceover script.
+            Any subtitle change instantly updates both preview output and voiceover script.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href="/">
               <Home className="h-4 w-4" />
-              Главная
+              Home
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="gap-2">
@@ -242,12 +242,12 @@ export default function JobDetailsPage() {
 
                   <div className="space-y-4">
                     <Card className="border-white/10 bg-black/45">
-                      <CardHeader>
-                        <CardTitle className="text-base">Subtitle editor on video</CardTitle>
-                        <CardDescription>
-                          Выберите сегмент и измените текст: overlay и voice script обновятся сразу.
-                        </CardDescription>
-                      </CardHeader>
+                    <CardHeader>
+                      <CardTitle className="text-base">Subtitle editor on video</CardTitle>
+                      <CardDescription>
+                          Select a segment and edit the text: overlay and voice script update immediately.
+                      </CardDescription>
+                    </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="max-h-[180px] space-y-2 overflow-auto pr-1">
                           {segments.map((segment) => (
@@ -285,13 +285,13 @@ export default function JobDetailsPage() {
 
                     <Card className="border-white/10 bg-black/45">
                       <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
+                      <CardTitle className="flex items-center gap-2 text-base">
                           <Volume2 className="h-4 w-4 text-white/80" />
                           Voiceover script
-                        </CardTitle>
-                        <CardDescription>
-                          Автогенерация из текущих субтитров для согласованной озвучки.
-                        </CardDescription>
+                      </CardTitle>
+                      <CardDescription>
+                          Auto-generated from current subtitles for synchronized voice output.
+                      </CardDescription>
                       </CardHeader>
                       <CardContent>
                         <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm leading-relaxed text-muted-foreground">
@@ -348,13 +348,13 @@ export default function JobDetailsPage() {
         <Card className="border-white/10 bg-black/50">
           <CardHeader>
             <CardTitle>Export</CardTitle>
-            <CardDescription>Скачивание файлов формируется на клиенте через Blob.</CardDescription>
+            <CardDescription>Downloads are generated on the client via Blob.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="mb-3 space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <p className="text-sm font-medium">Output appearance</p>
               <p className="text-xs text-muted-foreground">
-                Настройка того, как должен выглядеть перевод после обработки.
+                Configure how translated output should look after processing.
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1.5">
@@ -458,7 +458,7 @@ export default function JobDetailsPage() {
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground">
               <p className="flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-white/80" />
-                Любое изменение subtitle-сегментов сразу обновляет блок Voiceover script.
+                Any subtitle segment edit instantly updates the Voiceover script block.
               </p>
             </div>
 
