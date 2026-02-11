@@ -108,27 +108,16 @@ export function HomeMain() {
   const reducedMotion = usePrefersReducedMotion();
   const [selectedMode, setSelectedMode] = useState<(typeof modeCards)[number]["id"]>("live");
   const [showScrollHint, setShowScrollHint] = useState(true);
-  const [parallaxOffset, setParallaxOffset] = useState(0);
 
   useEffect(() => {
-    let raf = 0;
-
     const onScroll = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(() => {
-        const y = window.scrollY;
-        setParallaxOffset(y);
-        setShowScrollHint(y < 24);
-        raf = 0;
-      });
+      const shouldShow = window.scrollY < 24;
+      setShowScrollHint((prev) => (prev === shouldShow ? prev : shouldShow));
     };
 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      if (raf) window.cancelAnimationFrame(raf);
-    };
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const activeMode = useMemo(
@@ -149,15 +138,17 @@ export function HomeMain() {
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(900px_420px_at_20%_0%,rgba(255,255,255,0.14),transparent_56%),radial-gradient(700px_280px_at_90%_18%,rgba(255,255,255,0.08),transparent_65%),linear-gradient(180deg,#0a0c12_0%,#06070b_52%,#040509_100%)]"
         />
-        <div
+        <motion.div
           aria-hidden
+          animate={reducedMotion ? undefined : { y: [0, -12, 0] }}
+          transition={{ duration: 7.5, ease: "easeInOut", repeat: Infinity }}
           className="absolute -left-[14%] top-[28%] h-[460px] w-[460px] rounded-full border border-white/10 bg-white/[0.02] blur-3xl"
-          style={{ transform: `translate3d(0, ${-parallaxOffset * 0.08}px, 0)` }}
         />
-        <div
+        <motion.div
           aria-hidden
+          animate={reducedMotion ? undefined : { y: [0, -16, 0] }}
+          transition={{ duration: 8.3, ease: "easeInOut", repeat: Infinity, delay: 0.4 }}
           className="absolute -right-[16%] top-[10%] h-[380px] w-[380px] rounded-full border border-white/10 bg-white/[0.02] blur-3xl"
-          style={{ transform: `translate3d(0, ${-parallaxOffset * 0.12}px, 0)` }}
         />
         <div className="absolute inset-x-0 top-[20%] h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
 
