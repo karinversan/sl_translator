@@ -152,7 +152,7 @@ body::after {
   margin-top: calc(var(--cursor-dot-size) * -0.5);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
-  transition: opacity 120ms ease-out, transform 80ms linear;
+  transition: opacity 90ms ease-out;
 }
 
 .custom-cursor-ring {
