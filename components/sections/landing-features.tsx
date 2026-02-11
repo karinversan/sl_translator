@@ -8,10 +8,10 @@ export function LandingFeatures() {
     <section className="container mt-20 md:mt-24">
       <Reveal>
         <div className="mb-8">
-          <h2 className="section-title">Возможности</h2>
+          <h2 className="section-title">Features</h2>
           <p className="section-copy mt-3 max-w-2xl">
-            Интерфейс собран как единая дизайн-система: одинаковые карточки, чипсы, статусы,
-            переключатели и контролы во всех сценариях.
+            The interface is built as one design system: consistent cards, chips, statuses,
+            toggles, and controls across all flows.
           </p>
         </div>
       </Reveal>

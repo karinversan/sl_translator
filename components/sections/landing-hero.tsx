@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const heroDescription =
-  "SignFlow переводит жестовый язык в читаемые субтитры и синхронный voiceover. Это UI-прототип с живым сценарием: live, upload, editing и export.";
+  "SignFlow turns sign language into readable subtitles and synchronized voiceover. This UI prototype includes live, upload, editing, and export flows.";
 
 function Typewriter({ text }: { text: string }) {
   const [value, setValue] = useState("");
@@ -79,20 +79,20 @@ export function LandingHero() {
             <div className="mx-auto grid max-w-4xl gap-3 md:grid-cols-2">
               <div className="rounded-2xl border border-white/14 bg-black/38 p-5 backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-[0.18em] text-white/58">Mode 01</p>
-                <h3 className="mt-2 text-2xl font-semibold text-white">Live субтитры</h3>
+                <h3 className="mt-2 text-2xl font-semibold text-white">Live subtitles</h3>
                 <p className="mt-2 text-sm text-white/72">
-                  Режим реального времени: overlay субтитров, confidence и панель настроек.
+                  Realtime mode: subtitle overlay, confidence, and settings panel.
                 </p>
                 <Button asChild size="lg" className="mt-4 w-full rounded-full bg-white text-black hover:bg-white/90">
-                  <Link href="/live">Открыть Live</Link>
+                  <Link href="/live">Open Live</Link>
                 </Button>
               </div>
 
               <div className="rounded-2xl border border-white/14 bg-black/38 p-5 backdrop-blur-sm">
                 <p className="text-xs uppercase tracking-[0.18em] text-white/58">Mode 02</p>
-                <h3 className="mt-2 text-2xl font-semibold text-white">Загрузить видео</h3>
+                <h3 className="mt-2 text-2xl font-semibold text-white">Upload video</h3>
                 <p className="mt-2 text-sm text-white/72">
-                  Пост-обработка: загрузка, редактирование сегментов, выбор стиля и экспорт.
+                  Post-processing: upload, segment editing, style selection, and export.
                 </p>
                 <Button
                   asChild
@@ -100,7 +100,7 @@ export function LandingHero() {
                   variant="secondary"
                   className="mt-4 w-full rounded-full border-white/15 bg-black/48 text-white hover:bg-black/60"
                 >
-                  <Link href="/upload">Открыть Upload</Link>
+                  <Link href="/upload">Open Upload</Link>
                 </Button>
               </div>
             </div>

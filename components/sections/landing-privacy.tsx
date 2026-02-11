@@ -12,10 +12,10 @@ export function LandingPrivacy() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-primary" />
-              Приватность
+              Privacy
             </CardTitle>
             <CardDescription>
-              Никаких реальных обещаний: только понятное описание mock-режима.
+              No unrealistic promises: only clear explanation of the mock mode.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">

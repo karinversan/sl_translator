@@ -23,55 +23,55 @@ import { usePrefersReducedMotion } from "@/lib/hooks/use-prefers-reduced-motion"
 import { cn } from "@/lib/utils";
 
 const heroDescription =
-  "SignFlow переводит жестовый язык в читаемые субтитры и синхронный voiceover. Это интерфейсный прототип: вы можете пройти полный UX-сценарий и протестировать редактор.";
+  "SignFlow turns sign language into readable subtitles and synchronized voiceover. This is an interface prototype: you can walk through the full UX flow and test the editor.";
 
 const modeCards = [
   {
     id: "live",
     title: "Realtime",
-    subtitle: "Для прямых эфиров и встреч",
-    description: "Live overlay субтитров с мгновенным обновлением partial/final строк.",
-    bullets: ["Старт за 1 клик", "Настройки языка и голоса", "Быстрый возврат на главный экран"],
+    subtitle: "For live sessions and meetings",
+    description: "Live subtitle overlay with instant partial/final updates.",
+    bullets: ["One-click start", "Language and voice controls", "Quick return to home"],
     href: "/live",
     icon: Radio
   },
   {
     id: "video",
     title: "Video + Editor",
-    subtitle: "Для постобработки видео",
-    description: "Один файл -> сразу в редактор перевода, стиля и экспорта результатов.",
-    bullets: ["Редактирование сегментов", "Синхронный voiceover script", "Экспорт SRT/VTT/TXT/Mock media"],
+    subtitle: "For video post-processing",
+    description: "One file -> instant access to translation editing, styling, and export.",
+    bullets: ["Segment editing", "Synchronized voiceover script", "Export SRT/VTT/TXT/Mock media"],
     href: "/upload",
     icon: Clapperboard
   }
 ] as const;
 
-const audience = ["Создатели видео и short-form контента", "EdTech и образовательные команды", "Медиа- и продуктовые команды"];
+const audience = ["Video creators and short-form teams", "EdTech and education products", "Media and product teams"];
 
 const faqItems = [
   {
-    q: "Это уже реальная модель перевода жестов?",
-    a: "Нет. Текущая версия демонстрирует UX и клиентскую логику, без реальной ML-обработки видео."
+    q: "Is this a real sign translation model already?",
+    a: "No. This version demonstrates UX and client-side behavior without real ML video processing."
   },
   {
-    q: "Что я получаю на выходе?",
-    a: "Mock-результаты в интерфейсе: редактируемый transcript, voiceover script, экспорт SRT/VTT/TXT и демонстрационный export media."
+    q: "What output do I get?",
+    a: "Mock results in the interface: editable transcript, voiceover script, SRT/VTT/TXT export, and demo media export."
   },
   {
-    q: "Как выбрать режим?",
-    a: "Realtime для потока в реальном времени. Video + Editor для загрузки файла, редактуры и подготовки финального результата."
+    q: "How do I choose a mode?",
+    a: "Use Realtime for live streams. Use Video + Editor to upload a file, edit, and prepare a final result."
   },
   {
-    q: "Что с приватностью?",
-    a: "В этой демо-версии нет реальной отправки медиа. Все сценарии имитируются локально на фронтенде."
+    q: "What about privacy?",
+    a: "In this demo there is no real media upload. All scenarios are simulated locally in the frontend."
   },
   {
-    q: "Насколько точен перевод?",
-    a: "Точность не оценивается, потому что это прототип интерфейса. В будущем она будет зависеть от данных, условий съемки и модели."
+    q: "How accurate is the translation?",
+    a: "Accuracy is not measured yet because this is an interface prototype. Future accuracy will depend on data, capture conditions, and model quality."
   },
   {
-    q: "Можно ли отключить анимации?",
-    a: "Да. Сайт учитывает системную настройку prefers-reduced-motion и упрощает анимации автоматически."
+    q: "Can I disable animations?",
+    a: "Yes. The site respects the system prefers-reduced-motion setting and simplifies animations automatically."
   }
 ];
 
@@ -160,7 +160,7 @@ export function HomeMain() {
               PIXEL-TEXT / SUBTITLE-FIRST SIGN INTERFACE
             </p>
             <h1 className="font-accent text-[clamp(3rem,10vw,8.4rem)] uppercase leading-[0.88] tracking-tight">
-              Жесты -&gt; Субтитры -&gt; Речь
+              Signs -&gt; Subtitles -&gt; Speech
             </h1>
             <div className="mt-5">
               <Typewriter text={heroDescription} />
@@ -169,22 +169,22 @@ export function HomeMain() {
             <ul className="mt-6 space-y-2 text-sm text-white/76 md:text-base">
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-white/80" />
-                Realtime субтитры с partial/final отображением.
+                Realtime subtitles with partial/final rendering.
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-white/80" />
-                Video editor для правки текста, визуала и озвучки.
+                Video editor for text, visual, and voiceover edits.
               </li>
               <li className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-white/80" />
-                Экспорт SRT/VTT/TXT и mock media прямо из интерфейса.
+                Export SRT/VTT/TXT and mock media directly from the interface.
               </li>
             </ul>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Button asChild className="h-12 rounded-full bg-white px-6 text-black hover:bg-white/90">
                 <Link href={activeMode.href}>
-                  Запустить перевод
+                  Start translation
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -193,7 +193,7 @@ export function HomeMain() {
                 className="h-12 rounded-full px-6"
                 onClick={() => scrollToSection("how")}
               >
-                Как это работает
+                How it works
               </Button>
             </div>
 
@@ -236,9 +236,9 @@ export function HomeMain() {
         <Reveal>
           <div className="mx-auto mb-10 max-w-4xl text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-white/60">Mode selector</p>
-            <h2 className="mt-3 section-title">Выберите рабочий режим</h2>
+            <h2 className="mt-3 section-title">Choose your mode</h2>
             <p className="mx-auto mt-3 max-w-3xl section-copy">
-              Нужен поток сейчас - выбирайте Realtime. Нужна точная правка результата - открывайте Video + Editor.
+              Need live output now? Choose Realtime. Need precise editing? Open Video + Editor.
             </p>
           </div>
         </Reveal>
@@ -280,7 +280,7 @@ export function HomeMain() {
                     onMouseEnter={() => setSelectedMode(mode.id)}
                   >
                     <Link href={mode.href}>
-                      Открыть этот режим
+                      Open this mode
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
@@ -295,7 +295,7 @@ export function HomeMain() {
         <Reveal>
           <h2 className="section-title">How it works</h2>
           <p className="mt-3 max-w-3xl section-copy">
-            От захвата жестов до готового результата в 3 этапа. Порядок один и тот же для live и video pipeline.
+            From sign capture to final output in three steps. The same sequence applies to both live and video pipelines.
           </p>
         </Reveal>
         <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -318,9 +318,9 @@ export function HomeMain() {
 
       <section id="features" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
-          <h2 className="section-title">Ключевые возможности</h2>
+          <h2 className="section-title">Key features</h2>
           <p className="mt-3 max-w-3xl section-copy">
-            Один интерфейс для real-time потока и постобработки видео с единым набором элементов управления.
+            One interface for both real-time streaming and video post-processing, with a unified control set.
           </p>
         </Reveal>
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -342,14 +342,14 @@ export function HomeMain() {
         <Reveal>
           <h2 className="section-title">Demo preview</h2>
           <p className="mt-3 max-w-3xl section-copy">
-            Быстрый предпросмотр двух сценариев: live overlay и video editor. Без реальной загрузки медиа.
+            Quick preview of two scenarios: live overlay and video editor. No real media upload.
           </p>
         </Reveal>
         <div className="mt-8 grid gap-4 lg:grid-cols-2">
           <Card className="border-white/10 bg-black/48 backdrop-blur-none">
             <CardHeader>
               <CardTitle className="text-2xl">Realtime screen</CardTitle>
-              <CardDescription>Камера-плейсхолдер, статус, confidence и поток строк.</CardDescription>
+              <CardDescription>Camera placeholder, status, confidence, and subtitle stream.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-xl border border-white/12 bg-black/40 p-4">
@@ -359,7 +359,7 @@ export function HomeMain() {
                 </div>
                 <div className="relative h-44 rounded-lg border border-white/10 bg-white/[0.02]">
                   <div className="absolute bottom-3 left-3 right-3 rounded-md border border-white/15 bg-black/60 px-3 py-2 text-sm">
-                    Сейчас поток показывает финальную фразу перевода.
+                    The stream is currently showing the final translated phrase.
                   </div>
                 </div>
               </div>
@@ -369,18 +369,18 @@ export function HomeMain() {
           <Card className="border-white/10 bg-black/48 backdrop-blur-none">
             <CardHeader>
               <CardTitle className="text-2xl">Video + editor</CardTitle>
-              <CardDescription>Сегменты, ручная правка и синхронный voiceover script.</CardDescription>
+              <CardDescription>Segments, manual edits, and synchronized voiceover script.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2 rounded-xl border border-white/12 bg-black/40 p-4">
                 <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-sm">
-                  00:00:01 - 00:00:04 -&gt; Привет, это пример редактируемой строки.
+                  00:00:01 - 00:00:04 -&gt; Hello, this is an editable subtitle line example.
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-sm">
-                  00:00:05 - 00:00:08 -&gt; Изменения сразу попадают в script озвучки.
+                  00:00:05 - 00:00:08 -&gt; Changes instantly update the voiceover script.
                 </div>
                 <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-sm">
-                  00:00:09 - 00:00:13 -&gt; Экспорт готовится из текущего состояния.
+                  00:00:09 - 00:00:13 -&gt; Export is generated from the current state.
                 </div>
               </div>
             </CardContent>
@@ -390,10 +390,10 @@ export function HomeMain() {
 
       <section id="model" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
-          <h2 className="section-title">Модель и архитектура</h2>
+          <h2 className="section-title">Model and architecture</h2>
           <p className="mt-3 max-w-4xl section-copy">
-            Текущая версия описывает pipeline как интерфейсную схему: Vision encoder -&gt; текстовый декодер
-            -&gt; слой partial/final субтитров -&gt; модуль voiceover. Это UX-прототип, не production inference.
+            The current version describes the pipeline as an interface flow: Vision encoder -&gt; text decoder
+            -&gt; partial/final subtitle layer -&gt; voiceover module. This is a UX prototype, not production inference.
           </p>
         </Reveal>
         <Reveal delay={0.08}>
@@ -409,10 +409,9 @@ export function HomeMain() {
 
       <section id="status" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
-          <h2 className="section-title">О проекте, статус и ограничения</h2>
+          <h2 className="section-title">Project status and limitations</h2>
           <p className="mt-3 max-w-4xl section-copy">
-            Проект собран как демонстрационный frontend для проверки UX и пользовательских сценариев до интеграции
-            реальной модели.
+            This project is built as a demo frontend to validate UX and user scenarios before integrating a real model.
           </p>
         </Reveal>
         <div className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -420,7 +419,7 @@ export function HomeMain() {
             <Card className="h-full border-white/10 bg-black/45 backdrop-blur-none">
               <CardHeader>
                 <Cpu className="h-5 w-5 text-white/84" />
-                <CardTitle className="mt-3 text-xl">Кому полезно</CardTitle>
+                <CardTitle className="mt-3 text-xl">Who it helps</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-white/76">
@@ -438,7 +437,7 @@ export function HomeMain() {
             <Card className="h-full border-white/10 bg-black/45 backdrop-blur-none">
               <CardHeader>
                 <ShieldCheck className="h-5 w-5 text-white/84" />
-                <CardTitle className="mt-3 text-xl">Приватность</CardTitle>
+                <CardTitle className="mt-3 text-xl">Privacy</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-white/76">
@@ -460,9 +459,9 @@ export function HomeMain() {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-white/76">
-                  <li>v0: UX-прототип live и video editor</li>
-                  <li>v1: интеграция real ASR/SLR backend</li>
-                  <li>v2: совместная редактура и QA-пайплайн</li>
+                  <li>v0: live and video editor UX prototype</li>
+                  <li>v1: real ASR/SLR backend integration</li>
+                  <li>v2: collaborative editing and QA pipeline</li>
                 </ul>
               </CardContent>
             </Card>
@@ -473,7 +472,7 @@ export function HomeMain() {
       <section id="faq" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
           <h2 className="section-title">FAQ</h2>
-          <p className="mt-3 max-w-3xl section-copy">Короткие ответы по точности, форматам, статусу и ограничениям.</p>
+          <p className="mt-3 max-w-3xl section-copy">Short answers about accuracy, formats, status, and limitations.</p>
         </Reveal>
         <Reveal delay={0.08}>
           <Card className="mt-8 border-white/10 bg-black/45 backdrop-blur-none">
@@ -504,17 +503,17 @@ export function HomeMain() {
             <CardContent className="flex flex-col items-start justify-between gap-6 p-6 md:flex-row md:items-center">
               <div>
                 <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/62">Final CTA</p>
-                <h2 className="mt-2 text-3xl font-semibold md:text-4xl">Запустить рабочий сценарий</h2>
+                <h2 className="mt-2 text-3xl font-semibold md:text-4xl">Launch a working flow</h2>
                 <p className="mt-2 max-w-2xl section-copy">
-                  Выберите режим и перейдите к интерактивному интерфейсу переводчика без регистрации.
+                  Choose a mode and open the interactive translation interface with no sign-up.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <Button asChild className="h-12 rounded-full bg-white px-6 text-black">
-                  <Link href="/live">Открыть Realtime</Link>
+                  <Link href="/live">Open Realtime</Link>
                 </Button>
                 <Button asChild variant="secondary" className="h-12 rounded-full px-6">
-                  <Link href="/upload">Открыть Video + Editor</Link>
+                  <Link href="/upload">Open Video + Editor</Link>
                 </Button>
               </div>
             </CardContent>

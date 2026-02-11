@@ -8,9 +8,9 @@ export function LandingHow() {
     <section className="container mt-20 md:mt-24">
       <Reveal>
         <div className="mb-8 flex flex-col gap-4 border-y border-white/10 py-8 md:flex-row md:items-end md:justify-between">
-          <h2 className="section-title max-w-xl">Как работает</h2>
+          <h2 className="section-title max-w-xl">How it works</h2>
           <p className="section-copy max-w-md">
-            От захвата жестов до субтитров и озвучки: компактный pipeline в три шага.
+            From sign capture to subtitles and voiceover in three compact pipeline steps.
           </p>
         </div>
       </Reveal>
