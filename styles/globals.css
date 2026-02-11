@@ -100,6 +100,11 @@ body::after {
     @apply mb-8 border-b border-white/10 pb-6;
   }
 
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 920px;
+  }
+
   .glass-chip {
     @apply rounded-full border border-white/10 bg-white/[0.03] px-4 py-1.5 text-xs text-muted-foreground;
   }
