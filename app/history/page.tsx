@@ -40,14 +40,14 @@ export default function HistoryPage() {
         <div>
           <p className="page-kicker">Jobs history</p>
           <h1 className="section-title">History</h1>
-          <p className="page-lead">Mock список задач с фильтром по статусу, поиском и быстрым открытием.</p>
+          <p className="page-lead">Mock job list with status filters, search, and quick open actions.</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href="/">
               <Home className="h-4 w-4" />
-              Главная
+              Home
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="gap-2">

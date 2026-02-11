@@ -13,15 +13,15 @@ export default function AboutPage() {
           <p className="page-kicker">About the project</p>
           <h1 className="section-title">About SignFlow</h1>
           <p className="page-lead">
-            Мы проектируем интерфейсы, где субтитры становятся центральным слоем коммуникации.
-            Этот проект показывает визуальное направление и взаимодействия до подключения реального ML.
+            We design interfaces where subtitles become the central communication layer.
+            This project presents visual direction and interactions before real ML integration.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href="/">
               <Home className="h-4 w-4" />
-              Главная
+              Home
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="gap-2">

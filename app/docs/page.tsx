@@ -19,15 +19,15 @@ export default function DocsPage() {
           <p className="page-kicker">Docs and FAQ</p>
           <h1 className="section-title">Docs</h1>
           <p className="page-lead">
-            Быстрый старт: перейдите в `/live` для имитации потока и в `/upload` для mock-пайплайна
-            задач.
+            Quick start: open `/live` for simulated realtime streaming and `/upload` for the mock
+            video workflow.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="outline" size="sm" className="gap-2">
             <Link href="/">
               <Home className="h-4 w-4" />
-              Главная
+              Home
             </Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="gap-2">
@@ -51,10 +51,10 @@ export default function DocsPage() {
         </CardHeader>
         <CardContent>
           <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-            <li>Откройте Live и запустите поток кнопкой Start.</li>
-            <li>Измените язык/стиль в settings sheet.</li>
-            <li>Перейдите в Upload, добавьте mock-файл и создайте job.</li>
-            <li>На странице Job отредактируйте transcript и скачайте SRT/VTT.</li>
+            <li>Open Live and start the stream with the Start button.</li>
+            <li>Adjust language and style in the settings sheet.</li>
+            <li>Go to Upload, add a mock file, and create a job.</li>
+            <li>On the Job page, edit the transcript and download SRT/VTT.</li>
           </ol>
         </CardContent>
       </Card>
