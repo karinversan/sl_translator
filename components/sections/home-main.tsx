@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
 import {
   ArrowRight,
   CheckCircle2,
@@ -138,17 +137,20 @@ export function HomeMain() {
           aria-hidden
           className="absolute inset-0 bg-[radial-gradient(900px_420px_at_20%_0%,rgba(255,255,255,0.14),transparent_56%),radial-gradient(700px_280px_at_90%_18%,rgba(255,255,255,0.08),transparent_65%),linear-gradient(180deg,#0a0c12_0%,#06070b_52%,#040509_100%)]"
         />
-        <motion.div
+        <div
           aria-hidden
-          animate={reducedMotion ? undefined : { y: [0, -12, 0] }}
-          transition={{ duration: 7.5, ease: "easeInOut", repeat: Infinity }}
-          className="absolute -left-[14%] top-[28%] h-[460px] w-[460px] rounded-full border border-white/10 bg-white/[0.02] blur-3xl"
+          className={cn(
+            "absolute -left-[14%] top-[28%] h-[420px] w-[420px] rounded-full border border-white/10 bg-white/[0.02] blur-2xl",
+            !reducedMotion && "animate-float"
+          )}
         />
-        <motion.div
+        <div
           aria-hidden
-          animate={reducedMotion ? undefined : { y: [0, -16, 0] }}
-          transition={{ duration: 8.3, ease: "easeInOut", repeat: Infinity, delay: 0.4 }}
-          className="absolute -right-[16%] top-[10%] h-[380px] w-[380px] rounded-full border border-white/10 bg-white/[0.02] blur-3xl"
+          className={cn(
+            "absolute -right-[16%] top-[10%] h-[360px] w-[360px] rounded-full border border-white/10 bg-white/[0.02] blur-2xl",
+            !reducedMotion && "animate-float"
+          )}
+          style={!reducedMotion ? { animationDelay: "0.35s" } : undefined}
         />
         <div className="absolute inset-x-0 top-[20%] h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
 
@@ -223,18 +225,14 @@ export function HomeMain() {
           )}
         >
           <span className="relative inline-flex h-6 w-4 items-start justify-center rounded-full border border-white/40">
-            <motion.span
-              animate={reducedMotion ? undefined : { y: [2, 9, 2] }}
-              transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
-              className="mt-1 h-1.5 w-1.5 rounded-full bg-white/85"
-            />
+            <span className={cn("mt-1 h-1.5 w-1.5 rounded-full bg-white/85", !reducedMotion && "animate-pulse")} />
           </span>
           <Mouse className="h-3.5 w-3.5" />
           Scroll to modes
         </button>
       </section>
 
-      <section id="modes" className="container py-20">
+      <section id="modes" className="container cv-auto py-20">
         <Reveal>
           <div className="mx-auto mb-10 max-w-4xl text-center">
             <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-white/60">Mode selector</p>
@@ -250,7 +248,7 @@ export function HomeMain() {
             <Reveal key={mode.id} delay={index * 0.08}>
               <Card
                 className={cn(
-                  "h-full border-white/10 bg-black/45",
+                  "h-full border-white/10 bg-black/45 backdrop-blur-none",
                   selectedMode === mode.id && "border-white/25 bg-white/[0.05]"
                 )}
               >
@@ -293,7 +291,7 @@ export function HomeMain() {
         </div>
       </section>
 
-      <section id="how" className="container border-t border-white/10 py-20">
+      <section id="how" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
           <h2 className="section-title">How it works</h2>
           <p className="mt-3 max-w-3xl section-copy">
@@ -303,7 +301,7 @@ export function HomeMain() {
         <div className="mt-8 grid gap-4 md:grid-cols-3">
           {landingSteps.map((step, index) => (
             <Reveal key={step.title} delay={index * 0.08}>
-              <Card className="h-full border-white/10 bg-black/42">
+              <Card className="h-full border-white/10 bg-black/42 backdrop-blur-none">
                 <CardHeader>
                   <step.icon className="h-5 w-5 text-white/82" />
                   <CardTitle className="mt-3 text-2xl">{step.title}</CardTitle>
@@ -318,7 +316,7 @@ export function HomeMain() {
         </div>
       </section>
 
-      <section id="features" className="container border-t border-white/10 py-20">
+      <section id="features" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
           <h2 className="section-title">Ключевые возможности</h2>
           <p className="mt-3 max-w-3xl section-copy">
@@ -328,7 +326,7 @@ export function HomeMain() {
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {landingFeatures.map((feature, index) => (
             <Reveal key={feature.title} delay={index * 0.06}>
-              <Card className="h-full border-white/10 bg-black/45">
+              <Card className="h-full border-white/10 bg-black/45 backdrop-blur-none">
                 <CardHeader>
                   <feature.icon className="h-5 w-5 text-white/84" />
                   <CardTitle className="mt-3 text-xl">{feature.title}</CardTitle>
@@ -340,7 +338,7 @@ export function HomeMain() {
         </div>
       </section>
 
-      <section id="demo" className="container border-t border-white/10 py-20">
+      <section id="demo" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
           <h2 className="section-title">Demo preview</h2>
           <p className="mt-3 max-w-3xl section-copy">
@@ -348,7 +346,7 @@ export function HomeMain() {
           </p>
         </Reveal>
         <div className="mt-8 grid gap-4 lg:grid-cols-2">
-          <Card className="border-white/10 bg-black/48">
+          <Card className="border-white/10 bg-black/48 backdrop-blur-none">
             <CardHeader>
               <CardTitle className="text-2xl">Realtime screen</CardTitle>
               <CardDescription>Камера-плейсхолдер, статус, confidence и поток строк.</CardDescription>
@@ -368,7 +366,7 @@ export function HomeMain() {
             </CardContent>
           </Card>
 
-          <Card className="border-white/10 bg-black/48">
+          <Card className="border-white/10 bg-black/48 backdrop-blur-none">
             <CardHeader>
               <CardTitle className="text-2xl">Video + editor</CardTitle>
               <CardDescription>Сегменты, ручная правка и синхронный voiceover script.</CardDescription>
@@ -390,7 +388,7 @@ export function HomeMain() {
         </div>
       </section>
 
-      <section id="model" className="container border-t border-white/10 py-20">
+      <section id="model" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
           <h2 className="section-title">Модель и архитектура</h2>
           <p className="mt-3 max-w-4xl section-copy">
@@ -409,7 +407,7 @@ export function HomeMain() {
         </Reveal>
       </section>
 
-      <section id="status" className="container border-t border-white/10 py-20">
+      <section id="status" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
           <h2 className="section-title">О проекте, статус и ограничения</h2>
           <p className="mt-3 max-w-4xl section-copy">
@@ -419,7 +417,7 @@ export function HomeMain() {
         </Reveal>
         <div className="mt-8 grid gap-4 lg:grid-cols-3">
           <Reveal>
-            <Card className="h-full border-white/10 bg-black/45">
+            <Card className="h-full border-white/10 bg-black/45 backdrop-blur-none">
               <CardHeader>
                 <Cpu className="h-5 w-5 text-white/84" />
                 <CardTitle className="mt-3 text-xl">Кому полезно</CardTitle>
@@ -437,7 +435,7 @@ export function HomeMain() {
             </Card>
           </Reveal>
           <Reveal delay={0.06}>
-            <Card className="h-full border-white/10 bg-black/45">
+            <Card className="h-full border-white/10 bg-black/45 backdrop-blur-none">
               <CardHeader>
                 <ShieldCheck className="h-5 w-5 text-white/84" />
                 <CardTitle className="mt-3 text-xl">Приватность</CardTitle>
@@ -455,7 +453,7 @@ export function HomeMain() {
             </Card>
           </Reveal>
           <Reveal delay={0.12}>
-            <Card className="h-full border-white/10 bg-black/45">
+            <Card className="h-full border-white/10 bg-black/45 backdrop-blur-none">
               <CardHeader>
                 <Sparkles className="h-5 w-5 text-white/84" />
                 <CardTitle className="mt-3 text-xl">Roadmap</CardTitle>
@@ -472,13 +470,13 @@ export function HomeMain() {
         </div>
       </section>
 
-      <section id="faq" className="container border-t border-white/10 py-20">
+      <section id="faq" className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
           <h2 className="section-title">FAQ</h2>
           <p className="mt-3 max-w-3xl section-copy">Короткие ответы по точности, форматам, статусу и ограничениям.</p>
         </Reveal>
         <Reveal delay={0.08}>
-          <Card className="mt-8 border-white/10 bg-black/45">
+          <Card className="mt-8 border-white/10 bg-black/45 backdrop-blur-none">
             <CardContent className="p-0">
               <Accordion type="single" collapsible>
                 {faqItems.map((item, index) => (
@@ -500,9 +498,9 @@ export function HomeMain() {
         </Reveal>
       </section>
 
-      <section className="container border-t border-white/10 py-20">
+      <section className="container cv-auto border-t border-white/10 py-20">
         <Reveal>
-          <Card className="border-white/12 bg-black/45">
+          <Card className="border-white/12 bg-black/45 backdrop-blur-none">
             <CardContent className="flex flex-col items-start justify-between gap-6 p-6 md:flex-row md:items-center">
               <div>
                 <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-white/62">Final CTA</p>
