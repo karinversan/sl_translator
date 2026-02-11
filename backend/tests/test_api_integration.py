@@ -22,6 +22,15 @@ def _s3_client():
     )
 
 
+def test_health_includes_provider_metadata(client):
+    health_response = client.get("/v1/health")
+    assert health_response.status_code == 200
+    payload = health_response.json()
+    assert payload["status"] == "ok"
+    assert "provider" in payload
+    assert "provider" in payload["provider"]
+
+
 def test_upload_to_job_to_export_flow(client):
     session_response = client.post("/v1/sessions", json={"user_id": "int-test"})
     assert session_response.status_code == 200

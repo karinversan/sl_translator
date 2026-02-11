@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     s3_presign_expire_seconds: int = 900
 
     model_provider: str = "stub"
+    hf_token: str | None = None
+    hf_cache_dir: str = "/tmp/hf-cache"
+    hf_offline: bool = True
     public_api_base_url: str = "http://localhost:8000"
 
     worker_expire_interval_seconds: int = 20

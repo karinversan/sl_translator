@@ -9,6 +9,7 @@ This folder contains the first executable backend scaffold aligned with `docs/BA
 - 45-minute editing sessions with expiration checks.
 - Session restore flow with frontend lock when session expires.
 - Stub model provider (`ModelProvider` abstraction).
+- HF provider skeleton (`MODEL_PROVIDER=hf`) for future Hugging Face runtime wiring.
 - Model version registry API (`/v1/models`) with active model switching.
 - MinIO presigned upload/download URL integration.
 - Upload request validation (MIME + size guard).

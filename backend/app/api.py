@@ -132,7 +132,11 @@ def _assert_job_session_active(db: Session, job: Job) -> EditingSession:
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "service": settings.app_name}
+    return {
+        "status": "ok",
+        "service": settings.app_name,
+        "provider": get_model_provider().health(),
+    }
 
 
 @router.get("/models", response_model=list[ModelVersionResponse])
@@ -273,7 +277,10 @@ def create_job_for_session(session_id: str, payload: JobCreateRequest, db: Sessi
     db.refresh(job)
 
     provider = get_model_provider()
-    generated = provider.transcribe(session.video_object_key, options={"session_id": session.id})
+    generated = provider.transcribe(
+        session.video_object_key,
+        options={"session_id": session.id, "model_id": selected_model_id},
+    )
     for item in generated:
         db.add(
             TranscriptSegment(
