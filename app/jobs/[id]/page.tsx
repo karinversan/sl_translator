@@ -3,7 +3,19 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Download, Home, Radio, RefreshCcw, Sparkles, Upload, Volume2 } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Clock3,
+  Download,
+  Home,
+  Radio,
+  RefreshCcw,
+  Search,
+  Sparkles,
+  Upload,
+  Volume2
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { defaultTranscript, TranscriptSegment } from "@/lib/mock/jobs";
+import { formatSrtTime, formatTimecode, parseTimecodeInput, toSeconds } from "@/lib/utils/timecode";
 
 type PreviewMode = "Original" | "Subtitled" | "Voiceover";
 
@@ -37,10 +50,11 @@ function download(name: string, content: string, type = "text/plain") {
 }
 
 function toSrt(segments: TranscriptSegment[]) {
-  const toSrtTs = (value: string) => `${value},000`;
   return segments
     .map((segment, index) => {
-      return `${index + 1}\n${toSrtTs(segment.start)} --> ${toSrtTs(segment.end)}\n${segment.text}`;
+      return `${index + 1}\n${formatSrtTime(toSeconds(segment.start))} --> ${formatSrtTime(
+        toSeconds(segment.end)
+      )}\n${segment.text}`;
     })
     .join("\n\n");
 }
@@ -53,19 +67,43 @@ function toVtt(segments: TranscriptSegment[]) {
   ].join("\n");
 }
 
+function findSegmentByTime(segments: TranscriptSegment[], second: number) {
+  const normalized = Math.max(0, Math.floor(second));
+  const inside = segments.find((segment) => {
+    const start = toSeconds(segment.start);
+    const end = toSeconds(segment.end);
+    return normalized >= start && normalized < end;
+  });
+  if (inside) return inside;
+
+  return segments
+    .slice()
+    .reverse()
+    .find((segment) => normalized >= toSeconds(segment.start));
+}
+
 export default function JobDetailsPage() {
   const params = useParams<{ id: string }>();
   const [progress, setProgress] = useState(18);
   const [status, setStatus] = useState<"Processing" | "Done">("Processing");
+
   const [mode, setMode] = useState<PreviewMode>("Subtitled");
-  const [segments, setSegments] = useState<TranscriptSegment[]>(defaultTranscript);
-  const [playhead, setPlayhead] = useState(28);
+  const [segments, setSegments] = useState<TranscriptSegment[]>(defaultTranscript.map((item) => ({ ...item })));
   const [activeSegmentId, setActiveSegmentId] = useState(defaultTranscript[0]?.id ?? "");
+  const [segmentQuery, setSegmentQuery] = useState("");
+  const [jumpTo, setJumpTo] = useState("");
+
   const [subtitleSize, setSubtitleSize] = useState<"S" | "M" | "L">("M");
   const [subtitlePosition, setSubtitlePosition] = useState<"bottom" | "top">("bottom");
   const [subtitleBackground, setSubtitleBackground] = useState(true);
   const [textCase, setTextCase] = useState<"normal" | "upper" | "lower">("normal");
   const [voiceTone, setVoiceTone] = useState("Natural");
+
+  const totalDuration = useMemo(
+    () => Math.max(1, ...segments.map((segment) => toSeconds(segment.end))),
+    [segments]
+  );
+  const [playheadSec, setPlayheadSec] = useState(0);
 
   useEffect(() => {
     if (status === "Done") return;
@@ -83,11 +121,17 @@ export default function JobDetailsPage() {
     return () => clearInterval(timer);
   }, [status]);
 
+  const activeFromPlayhead = useMemo(
+    () => findSegmentByTime(segments, playheadSec),
+    [segments, playheadSec]
+  );
+
   useEffect(() => {
-    const index = Math.floor((playhead / 100) * (segments.length - 1));
-    const segment = segments[Math.max(0, index)];
-    if (segment) setActiveSegmentId(segment.id);
-  }, [playhead, segments]);
+    if (!activeFromPlayhead) return;
+    if (activeFromPlayhead.id !== activeSegmentId) {
+      setActiveSegmentId(activeFromPlayhead.id);
+    }
+  }, [activeFromPlayhead, activeSegmentId]);
 
   const updateSegment = (id: string, patch: Partial<TranscriptSegment>) => {
     setSegments((prev) => prev.map((segment) => (segment.id === id ? { ...segment, ...patch } : segment)));
@@ -97,6 +141,42 @@ export default function JobDetailsPage() {
     () => segments.find((segment) => segment.id === activeSegmentId) ?? segments[0],
     [activeSegmentId, segments]
   );
+
+  const activeIndex = Math.max(
+    0,
+    segments.findIndex((segment) => segment.id === activeSegmentId)
+  );
+
+  const selectSegment = (segment: TranscriptSegment) => {
+    setActiveSegmentId(segment.id);
+    setPlayheadSec(toSeconds(segment.start));
+  };
+
+  const moveBySegment = (direction: -1 | 1) => {
+    const nextIndex = Math.min(Math.max(activeIndex + direction, 0), segments.length - 1);
+    const next = segments[nextIndex];
+    if (!next) return;
+    selectSegment(next);
+  };
+
+  const onJumpToTime = () => {
+    const parsed = parseTimecodeInput(jumpTo);
+    if (parsed === null) return;
+    setPlayheadSec(Math.min(Math.max(parsed, 0), totalDuration));
+  };
+
+  const visibleSegments = useMemo(() => {
+    const q = segmentQuery.trim().toLowerCase();
+    if (!q) return segments;
+    return segments.filter((segment) => {
+      return (
+        segment.text.toLowerCase().includes(q) ||
+        segment.start.includes(q) ||
+        segment.end.includes(q) ||
+        segment.id.toLowerCase().includes(q)
+      );
+    });
+  }, [segments, segmentQuery]);
 
   const formatByCase = useCallback(
     (value: string) => {
@@ -108,12 +188,12 @@ export default function JobDetailsPage() {
   );
 
   const transcriptText = useMemo(() => segments.map((segment) => segment.text).join("\n"), [segments]);
+  const previewSegment = activeFromPlayhead ?? activeSegment;
   const previewText = useMemo(
-    () => (activeSegment ? formatByCase(activeSegment.text) : ""),
-    [activeSegment, formatByCase]
+    () => (previewSegment ? formatByCase(previewSegment.text) : ""),
+    [previewSegment, formatByCase]
   );
 
-  // Voiceover script intentionally derives from subtitles, so both stay in sync.
   const voiceoverScript = useMemo(
     () =>
       `Tone: ${voiceTone}. ${segments
@@ -138,7 +218,7 @@ export default function JobDetailsPage() {
           <p className="page-kicker">Job details</p>
           <h1 className="section-title text-[2.2rem] md:text-5xl">Results and Editor</h1>
           <p className="page-lead max-w-4xl">
-            Any subtitle change instantly updates both preview output and voiceover script.
+            Timeline-driven subtitle editing with fast navigation by exact timecode.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -181,7 +261,7 @@ export default function JobDetailsPage() {
         </CardHeader>
       </Card>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1.42fr_0.88fr]">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[1.46fr_0.84fr]">
         <Card className="border-white/10 bg-black/50">
           <CardHeader>
             <Tabs defaultValue="preview" className="w-full">
@@ -204,125 +284,137 @@ export default function JobDetailsPage() {
                   ))}
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-                  <div className="rounded-2xl border border-white/12 bg-black/45 p-4">
-                    <div className="relative flex h-[340px] items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
-                      <div className="absolute inset-0 scan-overlay opacity-35" />
-                      <p className="text-sm text-muted-foreground">Mock player ({mode})</p>
+                <div className="rounded-2xl border border-white/12 bg-black/45 p-4">
+                  <div className="relative flex h-[400px] items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+                    <div className="absolute inset-0 scan-overlay opacity-35" />
+                    <p className="text-sm text-muted-foreground">Mock player ({mode})</p>
 
-                      {mode !== "Original" && activeSegment && (
-                        <div
-                          className={`absolute ${subtitlePositionClass} left-1/2 w-[90%] max-w-xl -translate-x-1/2 rounded-lg px-3 py-2 text-center leading-snug ${subtitleSizeClass} ${
-                            subtitleBackground
-                              ? "border border-white/15 bg-black/55"
-                              : "border border-transparent bg-transparent"
-                          }`}
-                        >
-                          {mode === "Subtitled"
-                            ? previewText
-                            : `Voiceover: ${previewText}`}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Timeline scrubber</span>
-                        <span>{playhead}%</span>
+                    {mode !== "Original" && previewSegment && (
+                      <div
+                        className={`absolute ${subtitlePositionClass} left-1/2 w-[90%] max-w-3xl -translate-x-1/2 rounded-lg px-3 py-2 text-center leading-snug ${subtitleSizeClass} ${
+                          subtitleBackground
+                            ? "border border-white/15 bg-black/55"
+                            : "border border-transparent bg-transparent"
+                        }`}
+                      >
+                        {mode === "Subtitled" ? previewText : `Voiceover: ${previewText}`}
                       </div>
-                      <Slider
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={[playhead]}
-                        onValueChange={(value) => setPlayhead(value[0] ?? 0)}
-                      />
-                    </div>
+                    )}
                   </div>
 
-                  <div className="space-y-4">
-                    <Card className="border-white/10 bg-black/45">
-                    <CardHeader>
-                      <CardTitle className="text-base">Subtitle editor on video</CardTitle>
-                      <CardDescription>
-                          Select a segment and edit the text: overlay and voice script update immediately.
-                      </CardDescription>
-                    </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="max-h-[180px] space-y-2 overflow-auto pr-1">
-                          {segments.map((segment) => (
-                            <button
-                              key={segment.id}
-                              type="button"
-                              onClick={() => setActiveSegmentId(segment.id)}
-                              className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition ${
-                                activeSegmentId === segment.id
-                                  ? "border-white/28 bg-white/[0.08]"
-                                  : "border-white/10 bg-white/[0.02] hover:border-white/25"
-                              }`}
-                            >
-                              <p className="text-xs text-muted-foreground">
-                                {segment.start} - {segment.end}
-                              </p>
-                              <p className="mt-1 line-clamp-2">{segment.text}</p>
-                            </button>
-                          ))}
-                        </div>
+                  <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        Playhead {formatTimecode(playheadSec)} / {formatTimecode(totalDuration)}
+                      </span>
+                      <span>{segments.length} segments</span>
+                    </div>
 
-                        {activeSegment && (
-                          <div className="space-y-2 rounded-lg border border-white/10 bg-white/[0.02] p-3">
-                            <Label>Active subtitle text</Label>
-                            <Textarea
-                              value={activeSegment.text}
-                              onChange={(event) =>
-                                updateSegment(activeSegment.id, { text: event.target.value })
-                              }
-                            />
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                    <Slider
+                      min={0}
+                      max={totalDuration}
+                      step={1}
+                      value={[playheadSec]}
+                      onValueChange={(value) => setPlayheadSec(value[0] ?? 0)}
+                    />
 
-                    <Card className="border-white/10 bg-black/45">
-                      <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                          <Volume2 className="h-4 w-4 text-white/80" />
-                          Voiceover script
-                      </CardTitle>
-                      <CardDescription>
-                          Auto-generated from current subtitles for synchronized voice output.
-                      </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-3 text-sm leading-relaxed text-muted-foreground">
-                          {voiceoverScript}
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div className="relative mt-3 h-8 rounded-md border border-white/10 bg-black/30">
+                      {segments.map((segment) => {
+                        const start = toSeconds(segment.start);
+                        const end = toSeconds(segment.end);
+                        const left = (start / totalDuration) * 100;
+                        const width = Math.max(((end - start) / totalDuration) * 100, 1.5);
+                        const active = segment.id === activeSegmentId;
+
+                        return (
+                          <button
+                            key={segment.id}
+                            type="button"
+                            onClick={() => selectSegment(segment)}
+                            className={`absolute top-1 h-6 rounded-sm border transition ${
+                              active
+                                ? "border-white/40 bg-white/35"
+                                : "border-white/15 bg-white/10 hover:border-white/35"
+                            }`}
+                            style={{ left: `${left}%`, width: `${width}%` }}
+                            title={`${segment.start} - ${segment.end}`}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => moveBySegment(-1)}>
+                        <ChevronLeft className="h-4 w-4" />
+                        Prev segment
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => moveBySegment(1)}>
+                        Next segment
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        value={jumpTo}
+                        onChange={(event) => setJumpTo(event.target.value)}
+                        placeholder="Jump: 00:01:24 or 84"
+                        className="h-9 w-52"
+                      />
+                      <Button size="sm" variant="outline" onClick={onJumpToTime}>
+                        Jump
+                      </Button>
+                    </div>
+
+                    <div className="mt-3 rounded-lg border border-white/10 bg-black/25 p-3">
+                      <p className="mb-1 flex items-center gap-1.5 text-xs uppercase tracking-[0.16em] text-white/60">
+                        <Volume2 className="h-3.5 w-3.5" />
+                        Voiceover script
+                      </p>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{voiceoverScript}</p>
+                    </div>
                   </div>
                 </div>
               </TabsContent>
 
               <TabsContent value="transcript" className="space-y-3">
                 <div className="mt-4 space-y-3">
-                  {segments.map((segment) => (
-                    <div key={segment.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-                      <div className="mb-2 grid grid-cols-2 gap-2">
-                        <Input
-                          value={segment.start}
-                          onChange={(event) => updateSegment(segment.id, { start: event.target.value })}
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      className="pl-8"
+                      value={segmentQuery}
+                      onChange={(event) => setSegmentQuery(event.target.value)}
+                      placeholder="Search subtitle text or time"
+                    />
+                  </div>
+
+                  <div className="max-h-[440px] space-y-3 overflow-auto pr-1">
+                    {visibleSegments.map((segment) => (
+                      <div
+                        key={segment.id}
+                        className="rounded-xl border border-white/10 bg-white/[0.02] p-3"
+                      >
+                        <div className="mb-2 grid grid-cols-2 gap-2">
+                          <Input
+                            value={segment.start}
+                            onChange={(event) => updateSegment(segment.id, { start: event.target.value })}
+                          />
+                          <Input
+                            value={segment.end}
+                            onChange={(event) => updateSegment(segment.id, { end: event.target.value })}
+                          />
+                        </div>
+                        <Textarea
+                          value={segment.text}
+                          onChange={(event) => updateSegment(segment.id, { text: event.target.value })}
                         />
-                        <Input
-                          value={segment.end}
-                          onChange={(event) => updateSegment(segment.id, { end: event.target.value })}
-                        />
+                        <div className="mt-2">
+                          <Button size="sm" variant="ghost" onClick={() => selectSegment(segment)}>
+                            Open at playhead
+                          </Button>
+                        </div>
                       </div>
-                      <Textarea
-                        value={segment.text}
-                        onChange={(event) => updateSegment(segment.id, { text: event.target.value })}
-                      />
-                    </div>
-                  ))}
+                    ))}
+                  </div>
 
                   <Button
                     variant="secondary"
@@ -458,7 +550,7 @@ export default function JobDetailsPage() {
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs text-muted-foreground">
               <p className="flex items-center gap-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-white/80" />
-                Any subtitle segment edit instantly updates the Voiceover script block.
+                Subtitle edits and voiceover script remain synchronized across the full timeline.
               </p>
             </div>
 
