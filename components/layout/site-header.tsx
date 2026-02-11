@@ -85,7 +85,7 @@ export function SiteHeader() {
             <span className="font-accent text-base tracking-[0.16em]">SIGNFLOW</span>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden items-center gap-1 xl:flex">
             {isHome &&
               homeSections.map((item) => {
                 const active = activeSection === item.id;
@@ -132,7 +132,7 @@ export function SiteHeader() {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-10 w-10 rounded-full md:hidden"
+                  className="h-10 w-10 rounded-full xl:hidden"
                   aria-label="Открыть меню"
                 >
                   <Menu className="h-4 w-4" />
