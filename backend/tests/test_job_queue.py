@@ -1,4 +1,5 @@
 import httpx
+import time
 
 from app.config import settings
 from app.services.jobs import process_job_by_id
@@ -44,9 +45,21 @@ def test_create_job_queues_when_async_enabled(client):
         assert segments_before.json() == []
 
         dequeued = dequeue_inference_job(timeout_seconds=1)
-        assert dequeued is not None
-        assert dequeued.job_id == job_id
-        assert process_job_by_id(dequeued.job_id) == "done"
+        if dequeued is not None:
+            assert dequeued.job_id == job_id
+            assert process_job_by_id(dequeued.job_id) == "done"
+        else:
+            # Another worker/container can consume queue items in parallel.
+            deadline = time.time() + 3
+            final_status = "queued"
+            while time.time() < deadline and final_status in {"queued", "processing"}:
+                job_after = client.get(f"/v1/jobs/{job_id}")
+                assert job_after.status_code == 200
+                final_status = job_after.json()["status"]
+                if final_status == "done":
+                    break
+                time.sleep(0.2)
+            assert final_status == "done"
 
         job_after = client.get(f"/v1/jobs/{job_id}")
         assert job_after.status_code == 200

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,8 +10,11 @@ import {
   FileUp,
   Home,
   Loader2,
+  Pause,
+  Play,
   Plus,
   Radio,
+  RotateCcw,
   Search,
   Sparkles,
   Volume2
@@ -128,12 +131,19 @@ export default function UploadPage() {
   const [isRestoring, setIsRestoring] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoDurationSec, setVideoDurationSec] = useState(0);
+  const [videoVolume, setVideoVolume] = useState(1);
+  const [videoRate, setVideoRate] = useState("1");
   const [segments, setSegments] = useState<TranscriptSegment[]>(initialSegments);
   const [activeSegmentId, setActiveSegmentId] = useState(initialSegments[0]?.id ?? "");
   const [segmentQuery, setSegmentQuery] = useState("");
   const [jumpTo, setJumpTo] = useState("");
   const [timelineZoom, setTimelineZoom] = useState<TimelineZoom>("fit");
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [signLanguage, setSignLanguage] = useState("ASL");
   const [outputLanguage, setOutputLanguage] = useState("English");
@@ -160,7 +170,7 @@ export default function UploadPage() {
   const zoomLevels: TimelineZoom[] = ["fit", 1, 2, 4];
   const pxPerSecond = timelineZoom === "fit" ? 0 : 14 * timelineZoom;
 
-  const resetSessionState = (expired = false) => {
+  const resetSessionState = useCallback((expired = false) => {
     window.localStorage.removeItem(SESSION_STORAGE_KEY);
     window.localStorage.removeItem(JOB_STORAGE_KEY);
     setSessionId(null);
@@ -168,7 +178,27 @@ export default function UploadPage() {
     setRemainingSeconds(null);
     setFileName("");
     setSessionExpired(expired);
-  };
+  }, []);
+
+  const resetEditorState = useCallback(() => {
+    if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    setVideoPreviewUrl(null);
+    setIsVideoPlaying(false);
+    setVideoDurationSec(0);
+    setVideoVolume(1);
+    setVideoRate("1");
+    setSegments(defaultTranscript.map((item) => ({ ...item })));
+    setActiveSegmentId(defaultTranscript[0]?.id ?? "");
+    setPlayheadSec(0);
+    setSegmentQuery("");
+    setJumpTo("");
+    setBackendError(null);
+  }, [videoPreviewUrl]);
+
+  const startFreshSession = useCallback((expired = false) => {
+    resetSessionState(expired);
+    resetEditorState();
+  }, [resetEditorState, resetSessionState]);
 
   const trackWidthStyle = useMemo(() => {
     if (timelineZoom === "fit") return "100%";
@@ -221,7 +251,7 @@ export default function UploadPage() {
       try {
         const session = await getSession(storedSession);
         if (session.status !== "ACTIVE") {
-          resetSessionState(true);
+          startFreshSession(true);
           setIsRestoring(false);
           return;
         }
@@ -248,7 +278,7 @@ export default function UploadPage() {
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to restore session";
         if (isSessionExpiredMessage(message)) {
-          resetSessionState(true);
+          startFreshSession(true);
         }
         setBackendError(message);
       } finally {
@@ -257,7 +287,7 @@ export default function UploadPage() {
     };
 
     void restore();
-  }, []);
+  }, [startFreshSession]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -266,7 +296,7 @@ export default function UploadPage() {
         const session = await getSession(sessionId);
         if (session.status !== "ACTIVE" || session.remaining_seconds <= 0) {
           setBackendError("Session expired. Start a new upload to continue editing.");
-          resetSessionState(true);
+          startFreshSession(true);
           return;
         }
         setRemainingSeconds(session.remaining_seconds);
@@ -275,7 +305,23 @@ export default function UploadPage() {
       }
     }, 15000);
     return () => window.clearInterval(timer);
-  }, [sessionId]);
+  }, [sessionId, startFreshSession]);
+
+  useEffect(() => {
+    return () => {
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+    };
+  }, [videoPreviewUrl]);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    videoRef.current.volume = videoVolume;
+  }, [videoVolume]);
+
+  useEffect(() => {
+    if (!videoRef.current) return;
+    videoRef.current.playbackRate = Number(videoRate);
+  }, [videoRate]);
 
   const activeSegment = useMemo(
     () => segments.find((segment) => segment.id === activeSegmentId) ?? segments[0],
@@ -320,7 +366,11 @@ export default function UploadPage() {
 
   const selectSegment = (segment: TranscriptSegment) => {
     setActiveSegmentId(segment.id);
-    setPlayheadSec(toSeconds(segment.start));
+    const seconds = toSeconds(segment.start);
+    setPlayheadSec(seconds);
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, Math.min(seconds, videoDurationSec || totalDuration));
+    }
   };
 
   const moveBySegment = (direction: -1 | 1) => {
@@ -337,6 +387,7 @@ export default function UploadPage() {
     setBackendError(null);
     setSessionExpired(false);
     setIsUploading(true);
+    const previewUrl = URL.createObjectURL(file);
     try {
       let sid = sessionId;
       if (!sid) {
@@ -363,14 +414,18 @@ export default function UploadPage() {
       }
 
       setFileName(file.name);
+      if (videoPreviewUrl) URL.revokeObjectURL(videoPreviewUrl);
+      setVideoPreviewUrl(previewUrl);
     } catch (error) {
+      URL.revokeObjectURL(previewUrl);
       const message = error instanceof Error ? error.message : "Upload flow failed";
       if (isSessionExpiredMessage(message)) {
-        resetSessionState(true);
+        startFreshSession(true);
       }
       setBackendError(message);
     } finally {
       setIsUploading(false);
+      event.target.value = "";
     }
   };
 
@@ -401,7 +456,7 @@ export default function UploadPage() {
     void patchJobSegments(jobId, [payload]).catch((error) => {
       const message = error instanceof Error ? error.message : "Failed to sync segment";
       if (isSessionExpiredMessage(message)) {
-        resetSessionState(true);
+        startFreshSession(true);
       }
       setBackendError(message);
     });
@@ -433,7 +488,7 @@ export default function UploadPage() {
     ]).catch((error) => {
       const message = error instanceof Error ? error.message : "Failed to add segment";
       if (isSessionExpiredMessage(message)) {
-        resetSessionState(true);
+        startFreshSession(true);
       }
       setBackendError(message);
     });
@@ -442,8 +497,44 @@ export default function UploadPage() {
   const onJumpToTime = () => {
     const parsed = parseTimecodeInput(jumpTo);
     if (parsed === null) return;
-    setPlayheadSec(Math.min(Math.max(parsed, 0), totalDuration));
+    const nextTime = Math.min(Math.max(parsed, 0), totalDuration);
+    setPlayheadSec(nextTime);
+    if (videoRef.current) {
+      videoRef.current.currentTime = Math.max(0, Math.min(nextTime, videoDurationSec || totalDuration));
+    }
   };
+
+  const toggleVideoPlayback = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play();
+    } else {
+      video.pause();
+    }
+  };
+
+  const seekVideo = (seconds: number) => {
+    const next = Math.max(0, Math.min(seconds, videoDurationSec || totalDuration));
+    setPlayheadSec(next);
+    if (videoRef.current) {
+      videoRef.current.currentTime = next;
+    }
+  };
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space") return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const tag = target.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target.isContentEditable) return;
+      event.preventDefault();
+      toggleVideoPlayback();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   const handleExport = async (format: "SRT" | "VTT" | "TXT" | "AUDIO" | "VIDEO") => {
     if (isEditorLocked) return;
@@ -465,7 +556,7 @@ export default function UploadPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Export failed";
       if (isSessionExpiredMessage(message)) {
-        resetSessionState(true);
+        startFreshSession(true);
       }
       setBackendError(message);
     }
@@ -519,8 +610,7 @@ export default function UploadPage() {
               variant="secondary"
               size="sm"
               onClick={() => {
-                resetSessionState(false);
-                setBackendError(null);
+                startFreshSession(false);
               }}
             >
               Start new session
@@ -534,38 +624,71 @@ export default function UploadPage() {
           </div>
         )}
 
-        <Card className="border-white/10 bg-black/45">
-          <CardHeader>
-            <CardTitle>1) Upload video</CardTitle>
-            <CardDescription>Upload one file and move directly into the workspace editor.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <label
-              className={cn(
-                "flex min-h-36 items-center justify-center gap-3 rounded-2xl border border-dashed border-white/20 bg-white/[0.02] p-6 text-center",
-                isEditorLocked ? "cursor-not-allowed opacity-55" : "cursor-pointer hover:border-white/30"
-              )}
-            >
-              <FileUp className="h-6 w-6 text-white/75" />
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={onFileChange}
+          disabled={isEditorLocked || isUploading}
+        />
+
+        {!fileName ? (
+          <Card className="border-white/10 bg-black/45">
+            <CardHeader>
+              <CardTitle>1) Upload video</CardTitle>
+              <CardDescription>Upload one file and move directly into the workspace editor.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isEditorLocked || isUploading}
+                className={cn(
+                  "flex min-h-36 w-full items-center justify-center gap-3 rounded-2xl border border-dashed border-white/20 bg-white/[0.02] p-6 text-center",
+                  isEditorLocked || isUploading
+                    ? "cursor-not-allowed opacity-55"
+                    : "cursor-pointer hover:border-white/30"
+                )}
+              >
+                <FileUp className="h-6 w-6 text-white/75" />
+                <div>
+                  <p className="text-sm font-medium">Choose a video file</p>
+                  <p className="text-xs text-muted-foreground">mp4 / mov / mkv</p>
+                </div>
+              </button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-white/10 bg-black/45">
+            <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-sm font-medium">Choose a video file</p>
-                <p className="text-xs text-muted-foreground">mp4 / mov / mkv (mock)</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Loaded video</p>
+                <p className="text-sm">
+                  <span className="text-muted-foreground">File: </span>
+                  <span className="text-foreground">{fileName}</span>
+                </p>
               </div>
-              <input
-                type="file"
-                accept="video/*"
-                className="hidden"
-                onChange={onFileChange}
-                disabled={isEditorLocked}
-              />
-            </label>
-            {fileName && (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Uploaded: <span className="text-foreground">{fileName}</span>
-              </p>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="gap-2"
+                  onClick={() => {
+                    startFreshSession(false);
+                    requestAnimationFrame(() => fileInputRef.current?.click());
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Choose another video
+                </Button>
+                <Button type="button" variant="outline" onClick={() => startFreshSession(false)}>
+                  Start over
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {fileName && (
           <>
@@ -627,9 +750,35 @@ export default function UploadPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="relative flex h-[58vh] min-h-[460px] items-center justify-center rounded-xl border border-white/10 bg-black/35">
+                  <div className="relative flex h-[58vh] min-h-[460px] items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-black/35">
                     <div className="absolute inset-0 scan-overlay opacity-30" />
-                    <p className="text-sm text-muted-foreground">Mock video preview</p>
+                    {videoPreviewUrl ? (
+                      <video
+                        ref={videoRef}
+                        src={videoPreviewUrl}
+                        className="h-full w-full object-contain"
+                        playsInline
+                        preload="metadata"
+                        onLoadedMetadata={(event) => {
+                          const duration = Number.isFinite(event.currentTarget.duration)
+                            ? event.currentTarget.duration
+                            : 0;
+                          setVideoDurationSec(duration);
+                          event.currentTarget.volume = videoVolume;
+                          event.currentTarget.playbackRate = Number(videoRate);
+                        }}
+                        onTimeUpdate={(event) => {
+                          setPlayheadSec(event.currentTarget.currentTime);
+                        }}
+                        onPlay={() => setIsVideoPlaying(true)}
+                        onPause={() => setIsVideoPlaying(false)}
+                        onEnded={() => setIsVideoPlaying(false)}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Video preview becomes available right after upload.
+                      </p>
+                    )}
                     {subtitleEnabled && (mode === "subtitles" || mode === "both") && (
                       <div
                         className={cn(
@@ -652,9 +801,49 @@ export default function UploadPage() {
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <Clock3 className="h-3.5 w-3.5" />
-                        Playhead {formatTimecode(playheadSec)} / {formatTimecode(totalDuration)}
+                        Playhead {formatTimecode(playheadSec)} /{" "}
+                        {formatTimecode(videoDurationSec > 0 ? videoDurationSec : totalDuration)}
                       </span>
                       <span>{segments.length} segments</span>
+                    </div>
+
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="secondary" onClick={toggleVideoPlayback}>
+                        {isVideoPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        {isVideoPlaying ? "Pause" : "Play"}
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => seekVideo(playheadSec - 5)}>
+                        -5s
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => seekVideo(playheadSec + 5)}>
+                        +5s
+                      </Button>
+                      <div className="ml-auto flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Speed</span>
+                        <Select value={videoRate} onValueChange={setVideoRate}>
+                          <SelectTrigger className="h-8 w-20">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0.75">0.75x</SelectItem>
+                            <SelectItem value="1">1x</SelectItem>
+                            <SelectItem value="1.25">1.25x</SelectItem>
+                            <SelectItem value="1.5">1.5x</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="mb-3 rounded-lg border border-white/10 bg-black/25 p-2">
+                      <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Video volume</span>
+                        <span>{Math.round(videoVolume * 100)}%</span>
+                      </div>
+                      <Slider
+                        value={[Math.round(videoVolume * 100)]}
+                        onValueChange={(v) => setVideoVolume((v[0] ?? 100) / 100)}
+                        max={100}
+                      />
                     </div>
 
                     <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -679,10 +868,10 @@ export default function UploadPage() {
 
                     <Slider
                       min={0}
-                      max={totalDuration}
+                      max={videoDurationSec > 0 ? videoDurationSec : totalDuration}
                       step={1}
                       value={[playheadSec]}
-                      onValueChange={(v) => setPlayheadSec(v[0] ?? 0)}
+                      onValueChange={(v) => seekVideo(v[0] ?? 0)}
                     />
 
                     <div

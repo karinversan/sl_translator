@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleDot, Eraser, Mic2, Pause, Play, Settings2 } from "lucide-react";
+import { Camera, CircleDot, Eraser, Mic2, Pause, Play, Settings2 } from "lucide-react";
 
 import { useMediaQuery } from "@/lib/hooks/use-media-query";
 import { generateSubtitleChunk, seedSubtitles } from "@/lib/mock/subtitles";
@@ -42,8 +42,43 @@ export function LiveScreen() {
   const [settings, setSettings] = useState<LiveSettingsState>(defaultSettings);
   const [subtitleLines, setSubtitleLines] = useState<ReturnType<typeof seedSubtitles>>([]);
   const [confidence, setConfidence] = useState(86);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const seedRef = useRef(2);
+  const cameraRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const isDesktop = useMediaQuery("(min-width: 768px)");
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (cameraRef.current) {
+      cameraRef.current.srcObject = null;
+    }
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    if (streamRef.current) return;
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraError("Camera API is not available in this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      streamRef.current = stream;
+      if (cameraRef.current) {
+        cameraRef.current.srcObject = stream;
+        await cameraRef.current.play().catch(() => undefined);
+      }
+      setCameraError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Camera access denied";
+      setCameraError(message);
+      stopCamera();
+    }
+  }, [stopCamera]);
 
   useEffect(() => {
     const seeded = seedSubtitles();
@@ -69,6 +104,20 @@ export function LiveScreen() {
 
     return () => clearTimeout(timeoutId);
   }, [isRunning]);
+
+  useEffect(() => {
+    if (!isRunning || !cameraEnabled) {
+      stopCamera();
+      return;
+    }
+    void startCamera();
+  }, [cameraEnabled, isRunning, startCamera, stopCamera]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
 
   const status = isRunning ? "Connected" : "Idle";
 
@@ -125,6 +174,11 @@ export function LiveScreen() {
 
         <div className="relative flex-1">
           <div className="absolute inset-4 rounded-3xl border border-white/15 bg-black/25 md:inset-6" />
+          {cameraEnabled && (
+            <div className="absolute inset-4 overflow-hidden rounded-3xl bg-black/50 md:inset-6">
+              <video ref={cameraRef} className="h-full w-full object-cover" muted playsInline />
+            </div>
+          )}
           {subtitlesEnabled && (
             <SubtitleOverlay
               lines={subtitleLines}
@@ -148,6 +202,13 @@ export function LiveScreen() {
               </motion.div>
             )}
           </AnimatePresence>
+          {isRunning && cameraEnabled && cameraError && (
+            <div className="absolute inset-x-0 top-6 flex justify-center px-4">
+              <div className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+                Camera unavailable: {cameraError}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mx-4 mb-4 mt-3 rounded-xl border border-white/15 bg-black/35 px-4 py-3 backdrop-blur-xl md:mx-6">
@@ -175,6 +236,12 @@ export function LiveScreen() {
             <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5">
               <span className="text-sm">Subtitles</span>
               <Switch checked={subtitlesEnabled} onCheckedChange={setSubtitlesEnabled} />
+            </div>
+
+            <div className="flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.03] px-3 py-1.5">
+              <Camera className={cn("h-4 w-4", cameraEnabled ? "text-white/90" : "text-muted-foreground")} />
+              <span className="text-sm">Camera</span>
+              <Switch checked={cameraEnabled} onCheckedChange={setCameraEnabled} />
             </div>
 
             <Button

@@ -6,6 +6,7 @@ from app.db import Base, engine
 from app.db import SessionLocal
 from app.main import app
 from app.models import AuditEvent, EditingSession, ExportArtifact, Job, ModelVersion, TranscriptSegment
+from app.config import settings
 from app.security import rate_limiter
 from app.services.model_versions import ensure_default_model_version
 from app.services.queue import clear_inference_queue
@@ -13,6 +14,7 @@ from app.services.queue import clear_inference_queue
 
 @pytest.fixture(autouse=True)
 def reset_test_state():
+    settings.s3_public_endpoint_url = settings.s3_endpoint_url
     rate_limiter.reset()
     clear_inference_queue()
     engine.dispose()

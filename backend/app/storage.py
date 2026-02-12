@@ -20,12 +20,48 @@ def _s3_client():
     )
 
 
+def _presign_client():
+    endpoint = settings.s3_public_endpoint_url or settings.s3_endpoint_url
+    return boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id=settings.s3_access_key,
+        aws_secret_access_key=settings.s3_secret_key,
+        region_name=settings.s3_region,
+        config=Config(signature_version="s3v4"),
+        use_ssl=settings.s3_secure,
+    )
+
+
 def ensure_bucket_exists() -> None:
     client = _s3_client()
     try:
         client.head_bucket(Bucket=settings.s3_bucket)
     except ClientError:
         client.create_bucket(Bucket=settings.s3_bucket)
+
+    origins = [origin.strip() for origin in settings.s3_allowed_origins.split(",") if origin.strip()]
+    if not origins:
+        return
+
+    try:
+        client.put_bucket_cors(
+            Bucket=settings.s3_bucket,
+            CORSConfiguration={
+                "CORSRules": [
+                    {
+                        "AllowedHeaders": ["*"],
+                        "AllowedMethods": ["GET", "PUT", "HEAD"],
+                        "AllowedOrigins": origins,
+                        "ExposeHeaders": ["ETag"],
+                        "MaxAgeSeconds": 3000,
+                    }
+                ]
+            },
+        )
+    except ClientError:
+        # Do not fail startup if CORS update is not allowed by provider policy.
+        return
 
 
 def make_video_object_key(session_id: str, file_name: str) -> str:
@@ -39,7 +75,7 @@ def make_export_object_key(job_id: str, export_format: str) -> str:
 
 
 def create_upload_url(object_key: str, content_type: str) -> str:
-    client = _s3_client()
+    client = _presign_client()
     return client.generate_presigned_url(
         ClientMethod="put_object",
         Params={
@@ -52,7 +88,7 @@ def create_upload_url(object_key: str, content_type: str) -> str:
 
 
 def create_download_url(object_key: str) -> str:
-    client = _s3_client()
+    client = _presign_client()
     try:
         return client.generate_presigned_url(
             ClientMethod="get_object",

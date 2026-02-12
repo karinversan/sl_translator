@@ -11,12 +11,14 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = 45
 
     s3_endpoint_url: str = "http://minio:9000"
+    s3_public_endpoint_url: str = ""
     s3_access_key: str = "minioadmin"
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "signflow-assets"
     s3_region: str = "us-east-1"
     s3_secure: bool = False
     s3_presign_expire_seconds: int = 900
+    s3_allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
 
     model_provider: str = "stub"
     hf_token: str | None = None
