@@ -89,3 +89,9 @@ docker compose -f docker-compose.backend.yml up --build
 ```bash
 docker compose -f docker-compose.backend.yml run --rm api pytest tests -q
 ```
+
+- Run migrations in Docker:
+
+```bash
+docker compose -f docker-compose.backend.yml run --rm api alembic upgrade head
+```

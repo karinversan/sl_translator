@@ -1,3 +1,5 @@
+from typing import Literal
+
 from sqlalchemy import delete
 
 from app.db import SessionLocal
@@ -5,12 +7,14 @@ from app.models import Job, JobStatus, SessionStatus, TranscriptSegment
 from app.providers.registry import get_model_provider
 from app.services.sessions import utc_now
 
+JobProcessResult = Literal["done", "failed", "expired", "not_found"]
 
-def process_job_by_id(job_id: str) -> bool:
+
+def process_job_by_id(job_id: str) -> JobProcessResult:
     with SessionLocal() as db:
         job = db.get(Job, job_id)
         if not job:
-            return False
+            return "not_found"
 
         session = job.session
         now = utc_now()
@@ -19,13 +23,13 @@ def process_job_by_id(job_id: str) -> bool:
             job.status = JobStatus.EXPIRED
             job.updated_at = now
             db.commit()
-            return False
+            return "expired"
 
         if not session.video_object_key:
             job.status = JobStatus.FAILED
             job.updated_at = now
             db.commit()
-            return False
+            return "failed"
 
         job.status = JobStatus.PROCESSING
         job.progress = max(job.progress, 20)
@@ -42,7 +46,7 @@ def process_job_by_id(job_id: str) -> bool:
             job.status = JobStatus.FAILED
             job.updated_at = utc_now()
             db.commit()
-            return False
+            return "failed"
 
         db.execute(delete(TranscriptSegment).where(TranscriptSegment.job_id == job.id))
         for item in generated:
@@ -63,4 +67,4 @@ def process_job_by_id(job_id: str) -> bool:
         job.updated_at = utc_now()
         session.last_activity_at = utc_now()
         db.commit()
-        return True
+        return "done"

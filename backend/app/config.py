@@ -26,8 +26,10 @@ class Settings(BaseSettings):
 
     async_job_processing_enabled: bool = False
     jobs_queue_name: str = "signflow:jobs:inference"
+    jobs_dlq_name: str = "signflow:jobs:inference:dlq"
     worker_queue_pop_timeout_seconds: int = 1
     worker_idle_sleep_seconds: float = 1.0
+    worker_job_max_retries: int = 2
 
     worker_expire_interval_seconds: int = 20
     max_request_size_bytes: int = 52428800  # 50 MB for JSON/API requests

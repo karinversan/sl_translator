@@ -44,8 +44,9 @@ def test_create_job_queues_when_async_enabled(client):
         assert segments_before.json() == []
 
         dequeued = dequeue_inference_job(timeout_seconds=1)
-        assert dequeued == job_id
-        assert process_job_by_id(dequeued) is True
+        assert dequeued is not None
+        assert dequeued.job_id == job_id
+        assert process_job_by_id(dequeued.job_id) == "done"
 
         job_after = client.get(f"/v1/jobs/{job_id}")
         assert job_after.status_code == 200
