@@ -10,6 +10,8 @@ import {
   Download,
   Home,
   Loader2,
+  Pause,
+  Play,
   Radio,
   RefreshCcw,
   Search,
@@ -121,6 +123,10 @@ export default function JobDetailsPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionRemainingSeconds, setSessionRemainingSeconds] = useState<number | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [videoLoadError, setVideoLoadError] = useState<string | null>(null);
+  const [videoDurationSec, setVideoDurationSec] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   const [mode, setMode] = useState<PreviewMode>("Subtitled");
   const [segments, setSegments] = useState<TranscriptSegment[]>(defaultTranscript.map((item) => ({ ...item })));
@@ -129,6 +135,7 @@ export default function JobDetailsPage() {
   const [jumpTo, setJumpTo] = useState("");
   const [timelineZoom, setTimelineZoom] = useState<TimelineZoom>("fit");
   const timelineViewportRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [subtitleSize, setSubtitleSize] = useState<"S" | "M" | "L">("M");
   const [subtitlePosition, setSubtitlePosition] = useState<"bottom" | "top">("bottom");
@@ -177,6 +184,10 @@ export default function JobDetailsPage() {
         } else {
           setSessionExpired(false);
           setSessionRemainingSeconds(session.remaining_seconds);
+        }
+        if (session.video_ready && session.video_download_url) {
+          setVideoPreviewUrl(session.video_download_url);
+          setVideoLoadError(null);
         }
 
         const apiSegments = await getJobSegments(jobId);
@@ -249,13 +260,17 @@ export default function JobDetailsPage() {
           setSessionExpired(true);
           setBackendError("Session expired. Editing and exports are locked.");
         }
+        if (!videoPreviewUrl && session.video_ready && session.video_download_url) {
+          setVideoPreviewUrl(session.video_download_url);
+          setVideoLoadError(null);
+        }
       } catch {
         // Ignore transient session poll errors.
       }
     }, 15000);
 
     return () => window.clearInterval(timer);
-  }, [sessionId]);
+  }, [sessionId, videoPreviewUrl]);
 
   const activeFromPlayhead = useMemo(
     () => findSegmentByTime(segments, playheadSec),
@@ -276,6 +291,20 @@ export default function JobDetailsPage() {
     const nextLeft = Math.max(playheadSec * pxPerSecond - viewport.clientWidth * 0.5, 0);
     viewport.scrollTo({ left: nextLeft, behavior: "auto" });
   }, [playheadSec, timelineZoom, pxPerSecond]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== "Space") return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const tag = target.tagName.toLowerCase();
+      if (tag === "input" || tag === "textarea" || target.isContentEditable) return;
+      event.preventDefault();
+      toggleVideoPlayback();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [videoPreviewUrl]);
 
   const updateSegment = (id: string, patch: Partial<TranscriptSegment>) => {
     if (controlsLocked) return;
@@ -320,7 +349,11 @@ export default function JobDetailsPage() {
 
   const selectSegment = (segment: TranscriptSegment) => {
     setActiveSegmentId(segment.id);
-    setPlayheadSec(toSeconds(segment.start));
+    const next = toSeconds(segment.start);
+    setPlayheadSec(next);
+    if (videoRef.current) {
+      videoRef.current.currentTime = next;
+    }
   };
 
   const moveBySegment = (direction: -1 | 1) => {
@@ -333,7 +366,31 @@ export default function JobDetailsPage() {
   const onJumpToTime = () => {
     const parsed = parseTimecodeInput(jumpTo);
     if (parsed === null) return;
-    setPlayheadSec(Math.min(Math.max(parsed, 0), totalDuration));
+    const next = Math.min(Math.max(parsed, 0), videoDurationSec || totalDuration);
+    setPlayheadSec(next);
+    if (videoRef.current) {
+      videoRef.current.currentTime = next;
+    }
+  };
+
+  const playbackDuration = videoDurationSec > 0 ? videoDurationSec : totalDuration;
+
+  const seekVideo = (seconds: number) => {
+    const next = Math.max(0, Math.min(seconds, playbackDuration));
+    setPlayheadSec(next);
+    if (videoRef.current) {
+      videoRef.current.currentTime = next;
+    }
+  };
+
+  const toggleVideoPlayback = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play();
+    } else {
+      video.pause();
+    }
   };
 
   const handleRegenerate = async () => {
@@ -545,7 +602,37 @@ export default function JobDetailsPage() {
                 <div className="rounded-2xl border border-white/12 bg-black/45 p-4">
                   <div className="relative flex h-[400px] items-center justify-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
                     <div className="absolute inset-0 scan-overlay opacity-35" />
-                    <p className="text-sm text-muted-foreground">Mock player ({mode})</p>
+                    {videoPreviewUrl ? (
+                      <video
+                        ref={videoRef}
+                        src={videoPreviewUrl}
+                        className="h-full w-full object-contain"
+                        playsInline
+                        preload="metadata"
+                        controls
+                        onLoadedMetadata={(event) => {
+                          const duration = Number.isFinite(event.currentTarget.duration)
+                            ? event.currentTarget.duration
+                            : 0;
+                          setVideoDurationSec(duration);
+                          setVideoLoadError(null);
+                        }}
+                        onTimeUpdate={(event) => setPlayheadSec(event.currentTarget.currentTime)}
+                        onPlay={() => setIsVideoPlaying(true)}
+                        onPause={() => setIsVideoPlaying(false)}
+                        onEnded={() => setIsVideoPlaying(false)}
+                        onError={() => setVideoLoadError("Video file is unavailable for preview.")}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Video is not attached to this job yet.
+                      </p>
+                    )}
+                    {videoLoadError && (
+                      <div className="absolute left-3 top-3 rounded-lg border border-red-400/30 bg-red-500/10 px-2 py-1 text-xs text-red-200">
+                        {videoLoadError}
+                      </div>
+                    )}
 
                     {mode !== "Original" && previewSegment && (
                       <div
@@ -564,12 +651,27 @@ export default function JobDetailsPage() {
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <Clock3 className="h-3.5 w-3.5" />
-                        Playhead {formatTimecode(playheadSec)} / {formatTimecode(totalDuration)}
+                        Playhead {formatTimecode(playheadSec)} / {formatTimecode(playbackDuration)}
                       </span>
                       <span>{segments.length} segments</span>
                     </div>
 
                     <div className="mb-2 flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={toggleVideoPlayback}
+                        disabled={!videoPreviewUrl}
+                      >
+                        {isVideoPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        {isVideoPlaying ? "Pause" : "Play"}
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => seekVideo(playheadSec - 5)} disabled={!videoPreviewUrl}>
+                        -5s
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => seekVideo(playheadSec + 5)} disabled={!videoPreviewUrl}>
+                        +5s
+                      </Button>
                       <span className="text-xs text-muted-foreground">Timeline zoom</span>
                       {zoomLevels.map((level) => {
                         const active = timelineZoom === level;
@@ -591,10 +693,10 @@ export default function JobDetailsPage() {
 
                     <Slider
                       min={0}
-                      max={totalDuration}
+                      max={playbackDuration}
                       step={1}
                       value={[playheadSec]}
-                      onValueChange={(value) => setPlayheadSec(value[0] ?? 0)}
+                      onValueChange={(value) => seekVideo(value[0] ?? 0)}
                     />
 
                     <div
