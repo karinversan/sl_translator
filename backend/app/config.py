@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     canary_traffic_percent: int = 0
     public_api_base_url: str = "http://localhost:8000"
 
+    auth_enabled: bool = False
+    auth_api_keys: str = ""
+    auth_admin_api_keys: str = ""
+
     async_job_processing_enabled: bool = False
     jobs_queue_name: str = "signflow:jobs:inference"
     jobs_dlq_name: str = "signflow:jobs:inference:dlq"
@@ -42,6 +46,11 @@ class Settings(BaseSettings):
     rate_limit_upload_url_per_minute: int = 60
     rate_limit_job_create_per_minute: int = 30
     rate_limit_export_per_minute: int = 60
+
+    audit_persist_enabled: bool = True
+    audit_retention_days: int = 30
+    audit_cleanup_batch_size: int = 1000
+    worker_audit_cleanup_interval_seconds: int = 300
 
     model_config = SettingsConfigDict(
         env_file=".env",

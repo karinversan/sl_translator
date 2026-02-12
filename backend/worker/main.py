@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.db import SessionLocal
 from app.models import EditingSession, Job, JobStatus, SessionStatus
+from app.services.audit import prune_old_audit_events
 from app.services.jobs import process_job_by_id
 from app.services.queue import QueueJobMessage, dequeue_inference_job, push_dead_letter, requeue_inference_job
 from app.services.sessions import utc_now
@@ -55,7 +56,9 @@ def handle_dequeued_job(message: QueueJobMessage) -> str:
 def main():
     print("worker started")
     interval = max(settings.worker_expire_interval_seconds, 5)
+    audit_interval = max(settings.worker_audit_cleanup_interval_seconds, 30)
     next_expire_check = monotonic()
+    next_audit_cleanup = monotonic()
     while True:
         now = monotonic()
         if now >= next_expire_check:
@@ -63,6 +66,12 @@ def main():
             if count:
                 print(f"expired {count} sessions")
             next_expire_check = now + interval
+
+        if now >= next_audit_cleanup:
+            deleted = prune_old_audit_events()
+            if deleted:
+                print(f"deleted {deleted} old audit events")
+            next_audit_cleanup = now + audit_interval
 
         message = dequeue_inference_job(settings.worker_queue_pop_timeout_seconds)
         if message:

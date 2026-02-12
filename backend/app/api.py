@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import Principal, assert_admin, get_current_principal
 from app.config import settings
 from app.db import SessionLocal, get_db
 from app.models import (
@@ -131,8 +132,20 @@ def _load_job_or_404(db: Session, job_id: str) -> Job:
     return job
 
 
-def _assert_job_session_active(db: Session, job: Job) -> EditingSession:
+def _assert_session_access(session: EditingSession, principal: Principal) -> None:
+    if not settings.auth_enabled:
+        return
+    if principal.role == "admin":
+        return
+    if not session.user_id or not principal.user_id:
+        raise HTTPException(status_code=403, detail="forbidden")
+    if session.user_id != principal.user_id:
+        raise HTTPException(status_code=403, detail="forbidden")
+
+
+def _assert_job_session_active(db: Session, job: Job, principal: Principal) -> EditingSession:
     session = _load_session_or_404(db, job.session_id)
+    _assert_session_access(session, principal)
     ensure_session_active(session)
     return session
 
@@ -166,7 +179,13 @@ def get_active_model(db: Session = Depends(get_db)):
 
 
 @router.post("/models", response_model=ModelVersionResponse)
-def create_model(payload: ModelVersionCreateRequest, request: Request, db: Session = Depends(get_db)):
+def create_model(
+    payload: ModelVersionCreateRequest,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    assert_admin(principal)
     now = utc_now()
     model = ModelVersion(
         name=payload.name,
@@ -192,34 +211,65 @@ def create_model(payload: ModelVersionCreateRequest, request: Request, db: Sessi
         name=model.name,
         status=model.status.value,
         active=model.is_active,
+        user_id=principal.user_id,
     )
     return _model_to_response(model)
 
 
 @router.post("/models/{model_id}/activate", response_model=ModelVersionResponse)
-def activate_model(model_id: str, request: Request, db: Session = Depends(get_db)):
+def activate_model(
+    model_id: str,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    assert_admin(principal)
     model = db.get(ModelVersion, model_id)
     if not model:
         raise HTTPException(status_code=404, detail="model_not_found")
     activated = activate_model_version(db, model)
-    audit_log("model.activate", request=request, model_id=activated.id, status=activated.status.value)
+    audit_log(
+        "model.activate",
+        request=request,
+        model_id=activated.id,
+        status=activated.status.value,
+        user_id=principal.user_id,
+    )
     return _model_to_response(activated)
 
 
 @router.post("/models/{model_id}/sync", response_model=ModelVersionResponse)
-def sync_model(model_id: str, request: Request, db: Session = Depends(get_db)):
+def sync_model(
+    model_id: str,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    assert_admin(principal)
     model = db.get(ModelVersion, model_id)
     if not model:
         raise HTTPException(status_code=404, detail="model_not_found")
     try:
         synced = sync_model_version_artifacts(db, model)
-        audit_log("model.sync", request=request, model_id=synced.id, artifact_path=synced.artifact_path)
+        audit_log(
+            "model.sync",
+            request=request,
+            model_id=synced.id,
+            artifact_path=synced.artifact_path,
+            user_id=principal.user_id,
+        )
         return _model_to_response(synced)
     except Exception as exc:
         model.last_sync_error = str(exc)
         model.updated_at = utc_now()
         db.commit()
-        audit_log("model.sync_failed", request=request, model_id=model.id, error=str(exc))
+        audit_log(
+            "model.sync_failed",
+            request=request,
+            model_id=model.id,
+            error=str(exc),
+            user_id=principal.user_id,
+        )
         raise HTTPException(status_code=502, detail="model_sync_failed") from exc
 
 
@@ -230,10 +280,22 @@ def sync_model(model_id: str, request: Request, db: Session = Depends(get_db)):
         Depends(with_rate_limit(settings.rate_limit_session_create_per_minute, "sessions:create")),
     ],
 )
-def create_session(payload: SessionCreateRequest, request: Request, db: Session = Depends(get_db)):
+def create_session(
+    payload: SessionCreateRequest,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    resolved_user_id = payload.user_id or principal.user_id
+    if settings.auth_enabled and principal.role != "admin":
+        if payload.user_id and principal.user_id and payload.user_id != principal.user_id:
+            raise HTTPException(status_code=403, detail="forbidden")
+        if not resolved_user_id:
+            raise HTTPException(status_code=400, detail="user_id_required")
+
     now = utc_now()
     session = EditingSession(
-        user_id=payload.user_id,
+        user_id=resolved_user_id,
         status=SessionStatus.ACTIVE,
         created_at=now,
         expires_at=compute_expires_at(now, settings.session_ttl_minutes),
@@ -247,8 +309,9 @@ def create_session(payload: SessionCreateRequest, request: Request, db: Session 
 
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
-def get_session(session_id: str, db: Session = Depends(get_db)):
+def get_session(session_id: str, principal: Principal = Depends(get_current_principal), db: Session = Depends(get_db)):
     session = _load_session_or_404(db, session_id)
+    _assert_session_access(session, principal)
     stmt = select(Job).where(Job.session_id == session.id).order_by(Job.created_at.desc())
     active_job = db.scalars(stmt).first()
     return _session_to_response(session, active_job_id=active_job.id if active_job else None)
@@ -261,8 +324,15 @@ def get_session(session_id: str, db: Session = Depends(get_db)):
         Depends(with_rate_limit(settings.rate_limit_upload_url_per_minute, "sessions:upload-url")),
     ],
 )
-def create_session_upload_url(session_id: str, payload: UploadUrlRequest, request: Request, db: Session = Depends(get_db)):
+def create_session_upload_url(
+    session_id: str,
+    payload: UploadUrlRequest,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     session = _load_session_or_404(db, session_id)
+    _assert_session_access(session, principal)
     ensure_session_active(session)
 
     safe_name = validate_upload_request(payload.file_name, payload.content_type, payload.file_size_bytes)
@@ -272,7 +342,13 @@ def create_session_upload_url(session_id: str, payload: UploadUrlRequest, reques
     session.video_object_key = object_key
     session.last_activity_at = utc_now()
     db.commit()
-    audit_log("session.upload_url", request=request, session_id=session.id, object_key=object_key)
+    audit_log(
+        "session.upload_url",
+        request=request,
+        session_id=session.id,
+        object_key=object_key,
+        user_id=principal.user_id,
+    )
     return UploadUrlResponse(
         object_key=object_key,
         upload_url=upload_url,
@@ -287,8 +363,15 @@ def create_session_upload_url(session_id: str, payload: UploadUrlRequest, reques
         Depends(with_rate_limit(settings.rate_limit_job_create_per_minute, "sessions:create-job")),
     ],
 )
-def create_job_for_session(session_id: str, payload: JobCreateRequest, request: Request, db: Session = Depends(get_db)):
+def create_job_for_session(
+    session_id: str,
+    payload: JobCreateRequest,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     session = _load_session_or_404(db, session_id)
+    _assert_session_access(session, principal)
     ensure_session_active(session)
     if not session.video_object_key:
         raise HTTPException(status_code=400, detail="video_not_uploaded")
@@ -321,6 +404,7 @@ def create_job_for_session(session_id: str, payload: JobCreateRequest, request: 
         job_id=job_id,
         model_version_id=selected_model_id,
         async_mode=settings.async_job_processing_enabled,
+        user_id=principal.user_id,
     )
 
     if settings.async_job_processing_enabled:
@@ -342,23 +426,30 @@ def create_job_for_session(session_id: str, payload: JobCreateRequest, request: 
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponse)
-def get_job(job_id: str, db: Session = Depends(get_db)):
+def get_job(job_id: str, principal: Principal = Depends(get_current_principal), db: Session = Depends(get_db)):
     job = _load_job_or_404(db, job_id)
+    _assert_job_session_active(db, job, principal)
     return _job_to_response(job)
 
 
 @router.get("/jobs/{job_id}/segments", response_model=list[SegmentResponse])
-def get_job_segments(job_id: str, db: Session = Depends(get_db)):
+def get_job_segments(job_id: str, principal: Principal = Depends(get_current_principal), db: Session = Depends(get_db)):
     job = _load_job_or_404(db, job_id)
+    _assert_job_session_active(db, job, principal)
     stmt = select(TranscriptSegment).where(TranscriptSegment.job_id == job.id).order_by(TranscriptSegment.order_index.asc())
     segments = db.scalars(stmt).all()
     return [_segment_to_response(segment) for segment in segments]
 
 
 @router.patch("/jobs/{job_id}/segments", response_model=list[SegmentResponse])
-def patch_job_segments(job_id: str, payload: SegmentsPatchRequest, db: Session = Depends(get_db)):
+def patch_job_segments(
+    job_id: str,
+    payload: SegmentsPatchRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     job = _load_job_or_404(db, job_id)
-    _assert_job_session_active(db, job)
+    _assert_job_session_active(db, job, principal)
 
     stmt = select(TranscriptSegment).where(TranscriptSegment.job_id == job.id)
     segments = db.scalars(stmt).all()
@@ -402,9 +493,14 @@ def patch_job_segments(job_id: str, payload: SegmentsPatchRequest, db: Session =
 
 
 @router.post("/jobs/{job_id}/regenerate", response_model=list[SegmentResponse])
-def regenerate_job_segments(job_id: str, payload: RegenerateRequest, db: Session = Depends(get_db)):
+def regenerate_job_segments(
+    job_id: str,
+    payload: RegenerateRequest,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     job = _load_job_or_404(db, job_id)
-    _assert_job_session_active(db, job)
+    _assert_job_session_active(db, job, principal)
 
     stmt = select(TranscriptSegment).where(TranscriptSegment.job_id == job.id).order_by(TranscriptSegment.order_index.asc())
     segments = db.scalars(stmt).all()
@@ -438,9 +534,15 @@ def regenerate_job_segments(job_id: str, payload: RegenerateRequest, db: Session
         Depends(with_rate_limit(settings.rate_limit_export_per_minute, "jobs:export")),
     ],
 )
-def create_export(job_id: str, payload: ExportCreateRequest, request: Request, db: Session = Depends(get_db)):
+def create_export(
+    job_id: str,
+    payload: ExportCreateRequest,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
     job = _load_job_or_404(db, job_id)
-    _assert_job_session_active(db, job)
+    _assert_job_session_active(db, job, principal)
 
     stmt = select(TranscriptSegment).where(TranscriptSegment.job_id == job.id).order_by(TranscriptSegment.order_index.asc())
     segments = db.scalars(stmt).all()
@@ -482,6 +584,7 @@ def create_export(job_id: str, payload: ExportCreateRequest, request: Request, d
         export_id=export.id,
         format=payload.format,
         object_key=object_key,
+        user_id=principal.user_id,
     )
 
     return ExportResponse(
@@ -501,10 +604,12 @@ def get_mock_storage_object(object_key: str):
 
 
 @router.get("/exports/{export_id}", response_model=ExportResponse)
-def get_export(export_id: str, db: Session = Depends(get_db)):
+def get_export(export_id: str, principal: Principal = Depends(get_current_principal), db: Session = Depends(get_db)):
     export = db.get(ExportArtifact, export_id)
     if not export:
         raise HTTPException(status_code=404, detail="export_not_found")
+    job = _load_job_or_404(db, export.job_id)
+    _assert_job_session_active(db, job, principal)
     return ExportResponse(
         id=export.id,
         job_id=export.job_id,

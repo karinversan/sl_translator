@@ -105,6 +105,8 @@ curl -X POST http://localhost:8000/v1/models/<model-id>/sync
 If model artifacts include `segments.json` or `transcript.txt`, HF provider uses those files to generate transcript output.
 
 Canary routing is available via `CANARY_MODEL_ID` + `CANARY_TRAFFIC_PERCENT` for safe model rollout.
+Optional API-key auth is available via `AUTH_ENABLED`, `AUTH_API_KEYS`, `AUTH_ADMIN_API_KEYS`.
+Audit events are persisted to `audit_events` and auto-pruned by retention settings.
 
 - Monitoring endpoints:
   - Prometheus: `http://localhost:9090`

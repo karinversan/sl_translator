@@ -5,7 +5,7 @@ from sqlalchemy import delete
 from app.db import Base, engine
 from app.db import SessionLocal
 from app.main import app
-from app.models import EditingSession, ExportArtifact, Job, ModelVersion, TranscriptSegment
+from app.models import AuditEvent, EditingSession, ExportArtifact, Job, ModelVersion, TranscriptSegment
 from app.security import rate_limiter
 from app.services.model_versions import ensure_default_model_version
 from app.services.queue import clear_inference_queue
@@ -25,6 +25,7 @@ def reset_test_state():
         db.execute(delete(TranscriptSegment))
         db.execute(delete(Job))
         db.execute(delete(ModelVersion))
+        db.execute(delete(AuditEvent))
         db.execute(delete(EditingSession))
         db.commit()
         ensure_default_model_version(db)
@@ -40,6 +41,7 @@ def reset_test_state():
         db.execute(delete(TranscriptSegment))
         db.execute(delete(Job))
         db.execute(delete(ModelVersion))
+        db.execute(delete(AuditEvent))
         db.execute(delete(EditingSession))
         db.commit()
     finally:
