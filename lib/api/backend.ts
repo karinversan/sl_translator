@@ -42,6 +42,35 @@ export type ApiExport = {
   created_at: string;
 };
 
+export type ApiModelVersion = {
+  id: string;
+  name: string;
+  hf_repo: string;
+  hf_revision: string;
+  framework: string;
+  status: "staging" | "active" | "rollback";
+  is_active: boolean;
+  artifact_path: string | null;
+  downloaded_at: string | null;
+  last_sync_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ApiLivePrediction = {
+  label: string;
+  text: string;
+  confidence: number;
+  start_sec: number;
+  end_sec: number;
+};
+
+export type ApiLivePredictResult = {
+  model_version_id: string;
+  framework: string;
+  predictions: ApiLivePrediction[];
+};
+
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
 };
@@ -78,6 +107,10 @@ export async function createSession(userId?: string) {
     method: "POST",
     body: { user_id: userId ?? null },
   });
+}
+
+export async function listModels() {
+  return request<ApiModelVersion[]>("/models");
 }
 
 export async function getSession(sessionId: string) {
@@ -155,4 +188,37 @@ export async function createExport(jobId: string, format: "SRT" | "VTT" | "TXT" 
     method: "POST",
     body: { format },
   });
+}
+
+export async function livePredictChunk(params: {
+  file: Blob;
+  fileName?: string;
+  modelVersionId?: string;
+  decoderMode?: "auto" | "realtime" | "ctc";
+  topK?: number;
+}) {
+  const form = new FormData();
+  form.append("file", params.file, params.fileName ?? "live-chunk.webm");
+  if (params.modelVersionId) form.append("model_version_id", params.modelVersionId);
+  form.append("decoder_mode", params.decoderMode ?? "realtime");
+  form.append("top_k", String(params.topK ?? 3));
+
+  const response = await fetch(`${API_BASE}/live/predict`, {
+    method: "POST",
+    body: form,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let message = `${response.status} ${response.statusText}`;
+    try {
+      const data = await response.json();
+      if (typeof data?.detail === "string") message = data.detail;
+    } catch {
+      // ignore parse error
+    }
+    throw new Error(message);
+  }
+
+  return response.json() as Promise<ApiLivePredictResult>;
 }

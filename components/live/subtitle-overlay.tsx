@@ -1,8 +1,15 @@
-import { SubtitleChunk } from "@/lib/mock/subtitles";
 import { cn } from "@/lib/utils";
 
+export type SubtitleLine = {
+  id: string;
+  text: string;
+  confidence: number;
+  kind: "partial" | "final";
+  timestamp: string;
+};
+
 type SubtitleOverlayProps = {
-  lines: SubtitleChunk[];
+  lines: SubtitleLine[];
   size: "S" | "M" | "L";
   position: "bottom" | "top";
   withBackground: boolean;

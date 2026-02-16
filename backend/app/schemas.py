@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +29,26 @@ class ModelVersionResponse(BaseModel):
     last_sync_error: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class ModelRuntimeAssetsRequest(BaseModel):
+    labels: list[str] | dict[str, str] | None = None
+    labels_text: str | None = None
+    runtime_config: dict[str, Any] | None = None
+
+
+class LivePredictionResponse(BaseModel):
+    label: str
+    text: str
+    confidence: float
+    start_sec: float
+    end_sec: float
+
+
+class LivePredictResponse(BaseModel):
+    model_version_id: str
+    framework: str
+    predictions: list[LivePredictionResponse]
 
 
 class SessionResponse(BaseModel):

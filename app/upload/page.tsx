@@ -37,12 +37,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { outputLanguages, signLanguages, voiceOptions } from "@/lib/mock/data";
 import { defaultTranscript, TranscriptSegment } from "@/lib/mock/jobs";
 import {
+  ApiModelVersion,
   createExport,
   createJob,
   createSession,
   createUploadUrl,
   getJobSegments,
+  getJob,
   getSession,
+  listModels,
   patchJobSegments,
   uploadFileBySignedUrl,
 } from "@/lib/api/backend";
@@ -146,6 +149,8 @@ export default function UploadPage() {
   const [isRestoring, setIsRestoring] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [models, setModels] = useState<ApiModelVersion[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>("active");
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [videoDurationSec, setVideoDurationSec] = useState(0);
@@ -193,6 +198,24 @@ export default function UploadPage() {
     setSubtitleEnabled(true);
     setVoiceEnabled(true);
   }, [mode]);
+
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const fetched = await listModels();
+        setModels(fetched);
+        const active = fetched.find((model) => model.is_active);
+        if (active) {
+          setSelectedModelId(active.id);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load models";
+        setBackendError(message);
+      }
+    };
+
+    void loadModels();
+  }, []);
 
   const totalDuration = useMemo(
     () => Math.max(1, ...segments.map((segment) => toSeconds(segment.end))),
@@ -305,6 +328,10 @@ export default function UploadPage() {
         if (nextJobId) {
           setJobId(nextJobId);
           window.localStorage.setItem(JOB_STORAGE_KEY, nextJobId);
+          const job = await getJob(nextJobId);
+          if (job.model_version_id) {
+            setSelectedModelId(job.model_version_id);
+          }
           const apiSegments = await getJobSegments(nextJobId);
           const mapped = mapApiSegmentsToUi(apiSegments);
           if (mapped.length) {
@@ -400,6 +427,10 @@ export default function UploadPage() {
     return { size, position };
   }, [fontSize, subtitlePosition]);
 
+  const runtimeModels = useMemo(() => {
+    return models.filter((model) => ["torch", "torchscript", "onnx"].includes(model.framework.toLowerCase()));
+  }, [models]);
+
   const previewSegment = activeFromPlayhead ?? activeSegment;
   const previewText = previewSegment?.text?.trim() || "Select a segment from the timeline";
 
@@ -451,7 +482,8 @@ export default function UploadPage() {
       if (videoPreviewUrl?.startsWith("blob:")) URL.revokeObjectURL(videoPreviewUrl);
       setVideoPreviewUrl(previewUrl);
 
-      const job = await createJob(sid);
+      const modelForJob = selectedModelId === "active" ? undefined : selectedModelId;
+      const job = await createJob(sid, modelForJob);
       setJobId(job.id);
       window.localStorage.setItem(JOB_STORAGE_KEY, job.id);
 
@@ -784,6 +816,23 @@ export default function UploadPage() {
                       <SelectItem value="subtitles">Subtitles only</SelectItem>
                       <SelectItem value="voice">Voice only</SelectItem>
                       <SelectItem value="both">Subtitles + Voice</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 xl:col-span-3">
+                  <Label>Runtime model</Label>
+                  <Select value={selectedModelId} onValueChange={setSelectedModelId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Use active model</SelectItem>
+                      {runtimeModels.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          {model.name} • {model.framework}
+                          {model.is_active ? " • active" : ""}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

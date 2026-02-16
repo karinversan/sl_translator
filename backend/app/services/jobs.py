@@ -48,14 +48,18 @@ def process_job_by_id(job_id: str) -> JobProcessResult:
 
         provider = get_model_provider()
         model: ModelVersion | None = None
+        model_name: str | None = None
         model_repo: str | None = None
         model_revision: str | None = None
+        model_framework: str | None = None
         model_artifact_path: str | None = None
         if job.model_version_id:
             model = db.get(ModelVersion, job.model_version_id)
             if model:
+                model_name = model.name
                 model_repo = model.hf_repo
                 model_revision = model.hf_revision
+                model_framework = model.framework
                 if model.artifact_path and Path(model.artifact_path).exists():
                     model_artifact_path = model.artifact_path
 
@@ -74,8 +78,10 @@ def process_job_by_id(job_id: str) -> JobProcessResult:
                 options={
                     "session_id": session.id,
                     "model_id": job.model_version_id,
+                    "model_name": model_name,
                     "hf_repo": model_repo,
                     "hf_revision": model_revision,
+                    "framework": model_framework,
                     "artifact_path": model_artifact_path,
                 },
             )

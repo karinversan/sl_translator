@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     hf_token: str | None = None
     hf_cache_dir: str = "/tmp/hf-cache"
     hf_offline: bool = True
+    hf_runtime_enabled: bool = False
+    hf_runtime_strict: bool = True
+    hf_grammar_enabled: bool = False
+    hf_grammar_service_url: str = ""
+    hf_grammar_timeout_seconds: float = 8.0
     canary_model_id: str | None = None
     canary_traffic_percent: int = 0
     public_api_base_url: str = "http://localhost:8000"

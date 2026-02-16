@@ -1,6 +1,8 @@
 from uuid import uuid4
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,12 +22,16 @@ from app.models import (
 )
 from app.providers.base import ProviderSegment
 from app.providers.registry import get_model_provider
+from app.providers.runtime_classifier import infer_gesture_labels_from_file
 from app.security import with_rate_limit
 from app.schemas import (
     ExportCreateRequest,
     ExportResponse,
     JobCreateRequest,
     JobResponse,
+    LivePredictResponse,
+    LivePredictionResponse,
+    ModelRuntimeAssetsRequest,
     ModelVersionCreateRequest,
     ModelVersionResponse,
     RegenerateRequest,
@@ -41,6 +47,7 @@ from app.services.audit import audit_log
 from app.services.exports import render_srt, render_txt, render_vtt
 from app.services.model_routing import select_model_version_id
 from app.services.model_versions import activate_model_version, get_active_model_version, sync_model_version_artifacts
+from app.services.model_artifacts import ensure_model_artifacts, upsert_runtime_assets
 from app.services.jobs import process_job_by_id
 from app.services.queue import enqueue_inference_job
 from app.services.uploads import validate_upload_request
@@ -168,6 +175,110 @@ def health():
     }
 
 
+@router.post("/live/predict", response_model=LivePredictResponse)
+async def live_predict(
+    request: Request,
+    file: UploadFile = File(...),
+    model_version_id: str | None = Form(default=None),
+    decoder_mode: str = Form(default="realtime"),
+    top_k: int = Form(default=3),
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    normalized_mode = decoder_mode.strip().lower()
+    if normalized_mode not in {"auto", "realtime", "ctc"}:
+        raise HTTPException(status_code=400, detail="invalid_decoder_mode")
+    if file.content_type and not file.content_type.startswith("video/"):
+        raise HTTPException(status_code=400, detail="unsupported_media_type")
+
+    try:
+        selected_model_id = select_model_version_id(
+            db=db,
+            session_id=f"live:{principal.user_id or 'anonymous'}",
+            requested_model_id=model_version_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="model_not_found") from exc
+
+    model = db.get(ModelVersion, selected_model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="model_not_found")
+
+    normalized_framework = model.framework.strip().lower()
+    if normalized_framework not in {"torch", "torchscript", "onnx"}:
+        raise HTTPException(status_code=400, detail="model_framework_not_runtime_supported")
+
+    bounded_top_k = max(1, min(top_k, 10))
+
+    try:
+        if not model.artifact_path or not Path(model.artifact_path).exists():
+            artifact_path = ensure_model_artifacts(model.id, model.hf_repo, model.hf_revision)
+            now = utc_now()
+            model.artifact_path = artifact_path
+            model.downloaded_at = now
+            model.last_sync_error = None
+            model.updated_at = now
+            db.commit()
+            db.refresh(model)
+
+        payload = await file.read()
+        if not payload:
+            raise HTTPException(status_code=400, detail="empty_video_chunk")
+
+        suffix = Path(file.filename or "chunk.mp4").suffix or ".mp4"
+        with TemporaryDirectory(prefix="signflow-live-") as tmp_dir:
+            local_video_path = Path(tmp_dir) / f"chunk{suffix}"
+            local_video_path.write_bytes(payload)
+            predictions = infer_gesture_labels_from_file(
+                video_path=str(local_video_path),
+                artifact_path=model.artifact_path or "",
+                framework=normalized_framework,
+                top_k_override=bounded_top_k,
+                runtime_config_overrides={"decoder_mode": normalized_mode},
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        model.last_sync_error = str(exc)
+        model.updated_at = utc_now()
+        db.commit()
+        audit_log(
+            "live.predict_failed",
+            request=request,
+            model_id=model.id,
+            error=str(exc),
+            user_id=principal.user_id,
+        )
+        raise HTTPException(status_code=502, detail="live_inference_failed") from exc
+    finally:
+        await file.close()
+
+    response_predictions = [
+        LivePredictionResponse(
+            label=item.label,
+            text=f"Predicted gesture: {item.label}",
+            confidence=item.confidence,
+            start_sec=item.start_sec,
+            end_sec=item.end_sec,
+        )
+        for item in predictions
+    ]
+    audit_log(
+        "live.predict",
+        request=request,
+        model_id=model.id,
+        framework=normalized_framework,
+        prediction_count=len(response_predictions),
+        decoder_mode=normalized_mode,
+        user_id=principal.user_id,
+    )
+    return LivePredictResponse(
+        model_version_id=model.id,
+        framework=normalized_framework,
+        predictions=response_predictions,
+    )
+
+
 @router.get("/models", response_model=list[ModelVersionResponse])
 def list_models(db: Session = Depends(get_db)):
     stmt = select(ModelVersion).order_by(ModelVersion.created_at.desc())
@@ -276,6 +387,65 @@ def sync_model(
             user_id=principal.user_id,
         )
         raise HTTPException(status_code=502, detail="model_sync_failed") from exc
+
+
+@router.post("/models/{model_id}/runtime-assets", response_model=ModelVersionResponse)
+def upsert_model_runtime_assets(
+    model_id: str,
+    payload: ModelRuntimeAssetsRequest,
+    request: Request,
+    principal: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+):
+    assert_admin(principal)
+    model = db.get(ModelVersion, model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="model_not_found")
+
+    if payload.labels is None and payload.labels_text is None and payload.runtime_config is None:
+        raise HTTPException(status_code=400, detail="runtime_assets_empty")
+
+    try:
+        artifact_path = upsert_runtime_assets(
+            model.id,
+            model.hf_repo,
+            model.hf_revision,
+            labels=payload.labels,
+            labels_text=payload.labels_text,
+            runtime_config=payload.runtime_config,
+        )
+    except Exception as exc:
+        model.last_sync_error = str(exc)
+        model.updated_at = utc_now()
+        db.commit()
+        audit_log(
+            "model.runtime_assets_failed",
+            request=request,
+            model_id=model.id,
+            error=str(exc),
+            user_id=principal.user_id,
+        )
+        raise HTTPException(status_code=502, detail="runtime_assets_failed") from exc
+
+    now = utc_now()
+    model.artifact_path = artifact_path
+    model.downloaded_at = now
+    model.last_sync_error = None
+    model.updated_at = now
+    db.commit()
+    db.refresh(model)
+
+    audit_log(
+        "model.runtime_assets_upsert",
+        request=request,
+        model_id=model.id,
+        artifact_path=model.artifact_path,
+        labels_json=payload.labels is not None,
+        labels_txt=payload.labels_text is not None,
+        runtime_config=payload.runtime_config is not None,
+        user_id=principal.user_id,
+    )
+    return _model_to_response(model)
 
 
 @router.post(

@@ -238,6 +238,61 @@ def test_hf_provider_job_flow_with_local_synced_model(client):
         settings.model_provider = previous_provider
 
 
+def test_live_predict_uses_runtime_classifier(client, monkeypatch):
+    create_model_response = client.post(
+        "/v1/models",
+        json={
+            "name": "live-runtime-local",
+            "hf_repo": "local/live-runtime",
+            "hf_revision": "main",
+            "framework": "torchscript",
+            "activate": True,
+        },
+    )
+    assert create_model_response.status_code == 200
+    model_id = create_model_response.json()["id"]
+
+    sync_response = client.post(f"/v1/models/{model_id}/sync")
+    assert sync_response.status_code == 200
+
+    class _Prediction:
+        def __init__(self, label: str, confidence: float, start_sec: float, end_sec: float):
+            self.label = label
+            self.confidence = confidence
+            self.start_sec = start_sec
+            self.end_sec = end_sec
+
+    def fake_runtime_predict(
+        *,
+        video_path: str,
+        artifact_path: str,
+        framework: str,
+        top_k_override: int | None = None,
+        runtime_config_overrides: dict | None = None,
+    ):
+        assert video_path
+        assert artifact_path
+        assert framework == "torchscript"
+        assert top_k_override == 2
+        assert runtime_config_overrides == {"decoder_mode": "realtime"}
+        return [_Prediction(label="hello", confidence=0.91, start_sec=0.0, end_sec=0.7)]
+
+    monkeypatch.setattr("app.api.infer_gesture_labels_from_file", fake_runtime_predict)
+
+    response = client.post(
+        "/v1/live/predict",
+        files={"file": ("chunk.webm", b"live-webm", "video/webm")},
+        data={"model_version_id": model_id, "decoder_mode": "realtime", "top_k": "2"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["model_version_id"] == model_id
+    assert payload["framework"] == "torchscript"
+    assert len(payload["predictions"]) == 1
+    assert payload["predictions"][0]["label"] == "hello"
+    assert payload["predictions"][0]["text"] == "Predicted gesture: hello"
+
+
 def test_job_creation_uses_canary_routing_when_enabled(client):
     previous_canary_id = settings.canary_model_id
     previous_canary_percent = settings.canary_traffic_percent

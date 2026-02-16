@@ -116,3 +116,8 @@ def put_text_object(object_key: str, content: str, content_type: str) -> None:
         Body=content.encode("utf-8"),
         ContentType=content_type,
     )
+
+
+def download_object_file(object_key: str, destination_path: str) -> None:
+    client = _s3_client()
+    client.download_file(settings.s3_bucket, object_key, destination_path)
