@@ -291,7 +291,7 @@ export function LiveScreen() {
   }, [confidence]);
 
   const modelOptions = useMemo(() => {
-    return models.filter((item) => ["torch", "torchscript", "onnx"].includes(item.framework.toLowerCase()));
+    return models.filter((item) => ["torch", "torchscript"].includes(item.framework.toLowerCase()));
   }, [models]);
 
   return (
@@ -444,6 +444,7 @@ export function LiveScreen() {
                   <SelectValue placeholder="Select runtime model" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="active">Use active model</SelectItem>
                   {modelOptions.map((model) => (
                     <SelectItem key={model.id} value={model.id}>
                       {model.name} {model.framework === "torchscript" || model.framework === "torch" ? "(PyTorch)" : ""}

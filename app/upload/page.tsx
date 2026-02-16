@@ -437,7 +437,7 @@ export default function UploadPage() {
   }, [fontSize, subtitlePosition]);
 
   const runtimeModels = useMemo(() => {
-    return models.filter((model) => ["torch", "torchscript", "onnx"].includes(model.framework.toLowerCase()));
+    return models.filter((model) => ["torch", "torchscript"].includes(model.framework.toLowerCase()));
   }, [models]);
 
   const previewSegment = activeFromPlayhead ?? activeSegment;
